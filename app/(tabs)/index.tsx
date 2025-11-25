@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -439,7 +440,11 @@ const DashboardStage = ({
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
       <View style={styles.navHeader}>
-        <Text style={styles.logoType}>0Trace.</Text>
+        <Image
+          source={require('@/assets/images/0tracelabs-logo-dark.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
           <Ionicons name="settings-outline" size={20} color="#ffffff" />
         </Pressable>
@@ -509,7 +514,11 @@ const BrokersStage = ({
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
       <View style={styles.navHeader}>
-        <Text style={styles.logoType}>0Trace.</Text>
+        <Image
+          source={require('@/assets/images/0tracelabs-logo-dark.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
           <Ionicons name="settings-outline" size={20} color="#ffffff" />
         </Pressable>
@@ -579,7 +588,11 @@ const AlertsStage = ({
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
       <View style={styles.navHeader}>
-        <Text style={styles.logoType}>0Trace.</Text>
+        <Image
+          source={require('@/assets/images/0tracelabs-logo-dark.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
           <Ionicons name="settings-outline" size={20} color="#ffffff" />
         </Pressable>
@@ -1284,10 +1297,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  logoType: {
-    fontFamily: 'Outfit_700Bold',
-    color: '#ffffff',
-    fontSize: 22,
+  logoImage: {
+    height: 32,
+    width: 120,
   },
   navIcon: {
     width: 40,
