@@ -14,8 +14,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { router } from 'expo-router';
 
 type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard' | 'settings';
+type DashboardTab = 'dashboard' | 'brokers' | 'alerts' | 'settings';
 type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 type PlanId = 'annual' | 'monthly';
 
@@ -127,10 +130,10 @@ const LIVE_ACTIVITY = [
 ];
 
 const NAV_TABS = [
-  { icon: 'grid', label: 'Dashboard', active: true },
-  { icon: 'list', label: 'Brokers', active: false },
-  { icon: 'warning', label: 'Alerts', active: false },
-  { icon: 'settings', label: 'Settings', active: false },
+  { id: 'dashboard' as DashboardTab, icon: 'grid', label: 'Dashboard' },
+  { id: 'brokers' as DashboardTab, icon: 'list', label: 'Brokers' },
+  { id: 'alerts' as DashboardTab, icon: 'warning', label: 'Alerts' },
+  { id: 'settings' as DashboardTab, icon: 'settings', label: 'Settings' },
 ];
 
 const severityColors: Record<Severity, string> = {
@@ -425,17 +428,19 @@ const PaywallStage = ({
 );
 
 const DashboardStage = ({
-  onOpenSettings,
+  activeTab,
+  onTabChange,
   onRestart,
 }: {
-  onOpenSettings: () => void;
+  activeTab: DashboardTab;
+  onTabChange: (tab: DashboardTab) => void;
   onRestart: () => void;
 }) => (
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
       <View style={styles.navHeader}>
         <Text style={styles.logoType}>0Trace.</Text>
-        <Pressable style={styles.navIcon} onPress={onOpenSettings}>
+        <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
           <Ionicons name="settings-outline" size={20} color="#ffffff" />
         </Pressable>
       </View>
@@ -473,21 +478,163 @@ const DashboardStage = ({
         label="View Settings"
         colors={['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.08)']}
         textColor="#ffffff"
-        onPress={onOpenSettings}
+        onPress={() => onTabChange('settings')}
       />
       <Pressable onPress={onRestart} style={styles.restartLink}>
         <Text style={styles.restartText}>Restart Detonation Flow</Text>
       </Pressable>
       <GlassCard style={styles.navBar}>
         {NAV_TABS.map((tab) => (
-          <View key={tab.label} style={styles.navTab}>
+          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
             <Ionicons
               name={tab.icon as any}
               size={18}
-              color={tab.active ? COLOR.nuclearStart : COLOR.textMuted}
+              color={activeTab === tab.id ? COLOR.nuclearStart : COLOR.textMuted}
             />
-            <Text style={[styles.navLabel, tab.active && { color: '#ffffff' }]}>{tab.label}</Text>
+            <Text style={[styles.navLabel, activeTab === tab.id && { color: '#ffffff' }]}>{tab.label}</Text>
+          </Pressable>
+        ))}
+      </GlassCard>
+    </View>
+  </View>
+);
+
+const BrokersStage = ({
+  onTabChange,
+  onRestart,
+}: {
+  onTabChange: (tab: DashboardTab) => void;
+  onRestart: () => void;
+}) => (
+  <View style={[styles.stageBase, styles.stageSpacing]}>
+    <View>
+      <View style={styles.navHeader}>
+        <Text style={styles.logoType}>0Trace.</Text>
+        <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
+          <Ionicons name="settings-outline" size={20} color="#ffffff" />
+        </Pressable>
+      </View>
+      <Text style={styles.headline}>BROKERS</Text>
+      <Text style={styles.subhead}>Data brokers blocked and monitored.</Text>
+
+      <GlassCard style={styles.evidenceCard}>
+        <Text style={styles.cardTitle}>Blocked Brokers</Text>
+        {BROKER_FINDINGS.map((broker) => (
+          <View key={broker.name} style={styles.evidenceRow}>
+            <View style={styles.evidenceIcon}>
+              <Ionicons name="shield-checkmark" size={18} color="#3DD598" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.evidenceTitle}>{broker.name}</Text>
+              <Text style={styles.evidenceDetail}>{broker.detail}</Text>
+            </View>
+            <Text style={[styles.evidenceBadge, { color: '#3DD598' }]}>BLOCKED</Text>
           </View>
+        ))}
+      </GlassCard>
+
+      <GlassCard style={styles.liveLogCard}>
+        <Text style={styles.cardTitle}>Monitoring Activity</Text>
+        <View style={styles.logRow}>
+          <View style={[styles.logIcon, { backgroundColor: `${COLOR.nuclearStart}22` }]}>
+            <Ionicons name="eye" size={16} color={COLOR.nuclearStart} />
+          </View>
+          <Text style={styles.logText}>Scanning 512 brokers every hour</Text>
+        </View>
+        <View style={styles.logRow}>
+          <View style={[styles.logIcon, { backgroundColor: `${COLOR.successStart}22` }]}>
+            <Ionicons name="checkmark-circle" size={16} color={COLOR.successStart} />
+          </View>
+          <Text style={styles.logText}>Last scan: 2 minutes ago</Text>
+        </View>
+      </GlassCard>
+    </View>
+    <View style={styles.dashboardActions}>
+      <Pressable onPress={onRestart} style={styles.restartLink}>
+        <Text style={styles.restartText}>Restart Detonation Flow</Text>
+      </Pressable>
+      <GlassCard style={styles.navBar}>
+        {NAV_TABS.map((tab) => (
+          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
+            <Ionicons
+              name={tab.icon as any}
+              size={18}
+              color={tab.id === 'brokers' ? COLOR.nuclearStart : COLOR.textMuted}
+            />
+            <Text style={[styles.navLabel, tab.id === 'brokers' && { color: '#ffffff' }]}>{tab.label}</Text>
+          </Pressable>
+        ))}
+      </GlassCard>
+    </View>
+  </View>
+);
+
+const AlertsStage = ({
+  onTabChange,
+  onRestart,
+}: {
+  onTabChange: (tab: DashboardTab) => void;
+  onRestart: () => void;
+}) => (
+  <View style={[styles.stageBase, styles.stageSpacing]}>
+    <View>
+      <View style={styles.navHeader}>
+        <Text style={styles.logoType}>0Trace.</Text>
+        <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
+          <Ionicons name="settings-outline" size={20} color="#ffffff" />
+        </Pressable>
+      </View>
+      <Text style={styles.headline}>ALERTS</Text>
+      <Text style={styles.subhead}>Security notifications and threats detected.</Text>
+
+      <GlassCard style={styles.evidenceCard}>
+        <Text style={styles.cardTitle}>Recent Alerts</Text>
+        {SCAN_EVENTS.slice(0, 5).map((event, idx) => (
+          <View key={`${event.name}-${idx}`} style={styles.evidenceRow}>
+            <View style={[styles.streamIcon, { backgroundColor: `${severityColors[event.severity]}22` }]}>
+              <Ionicons name="warning" size={18} color={severityColors[event.severity]} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.evidenceTitle}>{event.name}</Text>
+              <Text style={styles.evidenceDetail}>{event.detail}</Text>
+            </View>
+            <Text style={[styles.streamSeverity, { color: severityColors[event.severity] }]}>
+              {severityTitles[event.severity]}
+            </Text>
+          </View>
+        ))}
+      </GlassCard>
+
+      <GlassCard style={styles.liveLogCard}>
+        <Text style={styles.cardTitle}>Alert Settings</Text>
+        <View style={styles.logRow}>
+          <View style={[styles.logIcon, { backgroundColor: `${COLOR.successStart}22` }]}>
+            <Ionicons name="notifications" size={16} color={COLOR.successStart} />
+          </View>
+          <Text style={styles.logText}>Push notifications enabled</Text>
+        </View>
+        <View style={styles.logRow}>
+          <View style={[styles.logIcon, { backgroundColor: `${COLOR.nuclearStart}22` }]}>
+            <Ionicons name="shield" size={16} color={COLOR.nuclearStart} />
+          </View>
+          <Text style={styles.logText}>Critical alerts only mode active</Text>
+        </View>
+      </GlassCard>
+    </View>
+    <View style={styles.dashboardActions}>
+      <Pressable onPress={onRestart} style={styles.restartLink}>
+        <Text style={styles.restartText}>Restart Detonation Flow</Text>
+      </Pressable>
+      <GlassCard style={styles.navBar}>
+        {NAV_TABS.map((tab) => (
+          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
+            <Ionicons
+              name={tab.icon as any}
+              size={18}
+              color={tab.id === 'alerts' ? COLOR.nuclearStart : COLOR.textMuted}
+            />
+            <Text style={[styles.navLabel, tab.id === 'alerts' && { color: '#ffffff' }]}>{tab.label}</Text>
+          </Pressable>
         ))}
       </GlassCard>
     </View>
@@ -501,7 +648,9 @@ const SettingsStage = ({
   onToggleMonitoring,
   onToggleAutoWipe,
   onToggleStealth,
-  onBack,
+  onTabChange,
+  onRestart,
+  onLogout,
 }: {
   monitoringEnabled: boolean;
   autoWipeEnabled: boolean;
@@ -509,7 +658,9 @@ const SettingsStage = ({
   onToggleMonitoring: () => void;
   onToggleAutoWipe: () => void;
   onToggleStealth: () => void;
-  onBack: () => void;
+  onTabChange: (tab: DashboardTab) => void;
+  onRestart: () => void;
+  onLogout?: () => void;
 }) => (
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
@@ -567,22 +718,38 @@ const SettingsStage = ({
         </View>
       </GlassCard>
     </View>
-    <View>
+    <View style={styles.dashboardActions}>
       <GradientButton
         label="Back to Dashboard"
         colors={[COLOR.nuclearStart, COLOR.nuclearEnd]}
         textColor="#02101F"
-        onPress={onBack}
+        onPress={() => onTabChange('dashboard')}
       />
-      <Pressable style={styles.dangerButton}>
-        <Text style={styles.dangerButtonText}>DESTROY ACCOUNT</Text>
+      <Pressable style={styles.dangerButton} onPress={onLogout}>
+        <Text style={styles.dangerButtonText}>SIGN OUT</Text>
       </Pressable>
+      <Pressable onPress={onRestart} style={styles.restartLink}>
+        <Text style={styles.restartText}>Restart Detonation Flow</Text>
+      </Pressable>
+      <GlassCard style={styles.navBar}>
+        {NAV_TABS.map((tab) => (
+          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
+            <Ionicons
+              name={tab.icon as any}
+              size={18}
+              color={tab.id === 'settings' ? COLOR.nuclearStart : COLOR.textMuted}
+            />
+            <Text style={[styles.navLabel, tab.id === 'settings' && { color: '#ffffff' }]}>{tab.label}</Text>
+          </Pressable>
+        ))}
+      </GlassCard>
     </View>
   </View>
 );
 
 export default function HomeScreen() {
   const [stage, setStage] = useState<ExperienceStage>('welcome');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('dashboard');
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('annual');
   const [monitoringEnabled, setMonitoringEnabled] = useState(true);
   const [autoWipeEnabled, setAutoWipeEnabled] = useState(true);
@@ -590,6 +757,7 @@ export default function HomeScreen() {
   const [scanProgress, setScanProgress] = useState(12);
   const [scanMessage, setScanMessage] = useState(SCAN_MESSAGES[0]);
   const [scanStream, setScanStream] = useState<ScanEvent[]>([]);
+  const { signOut } = useAuthStore();
 
   useEffect(() => {
     let progressTimer: ReturnType<typeof setInterval> | undefined;
@@ -633,6 +801,15 @@ export default function HomeScreen() {
     };
   }, [stage]);
 
+  const handleTabChange = (tab: DashboardTab) => {
+    setActiveDashboardTab(tab);
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace('/auth/login' as any);
+  };
+
   const renderStage = () => {
     switch (stage) {
       case 'welcome':
@@ -646,13 +823,43 @@ export default function HomeScreen() {
           <PaywallStage
             selectedPlan={selectedPlan}
             onSelectPlan={setSelectedPlan}
-            onActivate={() => setStage('dashboard')}
+            onActivate={() => {
+              setStage('dashboard');
+              setActiveDashboardTab('dashboard');
+            }}
           />
         );
       case 'dashboard':
-        return (
-          <DashboardStage onOpenSettings={() => setStage('settings')} onRestart={() => setStage('welcome')} />
-        );
+        switch (activeDashboardTab) {
+          case 'dashboard':
+            return (
+              <DashboardStage
+                activeTab={activeDashboardTab}
+                onTabChange={handleTabChange}
+                onRestart={() => setStage('welcome')}
+              />
+            );
+          case 'brokers':
+            return <BrokersStage onTabChange={handleTabChange} onRestart={() => setStage('welcome')} />;
+          case 'alerts':
+            return <AlertsStage onTabChange={handleTabChange} onRestart={() => setStage('welcome')} />;
+          case 'settings':
+            return (
+              <SettingsStage
+                monitoringEnabled={monitoringEnabled}
+                autoWipeEnabled={autoWipeEnabled}
+                stealthAlerts={stealthAlerts}
+                onToggleMonitoring={() => setMonitoringEnabled((prev) => !prev)}
+                onToggleAutoWipe={() => setAutoWipeEnabled((prev) => !prev)}
+                onToggleStealth={() => setStealthAlerts((prev) => !prev)}
+                onTabChange={handleTabChange}
+                onRestart={() => setStage('welcome')}
+                onLogout={handleLogout}
+              />
+            );
+          default:
+            return null;
+        }
       case 'settings':
         return (
           <SettingsStage
@@ -662,7 +869,9 @@ export default function HomeScreen() {
             onToggleMonitoring={() => setMonitoringEnabled((prev) => !prev)}
             onToggleAutoWipe={() => setAutoWipeEnabled((prev) => !prev)}
             onToggleStealth={() => setStealthAlerts((prev) => !prev)}
-            onBack={() => setStage('dashboard')}
+            onTabChange={handleTabChange}
+            onRestart={() => setStage('welcome')}
+            onLogout={handleLogout}
           />
         );
       default:
