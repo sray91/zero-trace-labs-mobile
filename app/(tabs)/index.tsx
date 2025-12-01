@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import { router } from 'expo-router';
 
 type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard' | 'settings';
@@ -761,6 +762,7 @@ const SettingsStage = ({
 );
 
 export default function HomeScreen() {
+  const { welcomeCompleted, completeWelcome, initialize: initializeOnboarding } = useOnboardingStore();
   const [stage, setStage] = useState<ExperienceStage>('welcome');
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('dashboard');
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('annual');
@@ -771,6 +773,18 @@ export default function HomeScreen() {
   const [scanMessage, setScanMessage] = useState(SCAN_MESSAGES[0]);
   const [scanStream, setScanStream] = useState<ScanEvent[]>([]);
   const { signOut } = useAuthStore();
+
+  // Initialize onboarding state and set initial stage
+  useEffect(() => {
+    initializeOnboarding();
+  }, [initializeOnboarding]);
+
+  // Skip to dashboard if welcome already completed
+  useEffect(() => {
+    if (welcomeCompleted && stage === 'welcome') {
+      setStage('dashboard');
+    }
+  }, [welcomeCompleted, stage]);
 
   useEffect(() => {
     let progressTimer: ReturnType<typeof setInterval> | undefined;
@@ -837,6 +851,7 @@ export default function HomeScreen() {
             selectedPlan={selectedPlan}
             onSelectPlan={setSelectedPlan}
             onActivate={() => {
+              completeWelcome();
               setStage('dashboard');
               setActiveDashboardTab('dashboard');
             }}
@@ -903,7 +918,10 @@ export default function HomeScreen() {
       </View>
       <View style={styles.content}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            welcomeCompleted && { paddingBottom: 80 }
+          ]}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
