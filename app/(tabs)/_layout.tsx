@@ -42,17 +42,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="brokers"
         options={{
-          title: 'Comprehensive search',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
+          title: 'Brokers',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="removal-requests"
+        name="alerts"
         options={{
-          title: 'Removal requests',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="trash.fill" color={color} />,
+          title: 'Alerts',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="exclamationmark.triangle.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -60,6 +60,18 @@ export default function TabLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="removal-requests"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

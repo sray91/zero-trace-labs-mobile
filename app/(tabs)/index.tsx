@@ -19,8 +19,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import { router } from 'expo-router';
 
-type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard' | 'settings';
-type DashboardTab = 'dashboard' | 'brokers' | 'alerts' | 'settings';
+type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard';
 type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 type PlanId = 'annual' | 'monthly';
 
@@ -54,14 +53,13 @@ const COLOR = {
   textMuted: '#8B93B6',
 };
 
-const STAGE_FLOW: ExperienceStage[] = ['welcome', 'scan', 'results', 'paywall', 'dashboard', 'settings'];
+const STAGE_FLOW: ExperienceStage[] = ['welcome', 'scan', 'results', 'paywall', 'dashboard'];
 const STAGE_LABELS: Record<ExperienceStage, string> = {
   welcome: 'Welcome',
   scan: 'Live Scan',
   results: 'Critical Findings',
   paywall: 'Authorize Detonation',
   dashboard: 'Clean Slate',
-  settings: 'Settings',
 };
 
 const SCAN_MESSAGES = [
@@ -131,12 +129,6 @@ const LIVE_ACTIVITY = [
   { icon: 'shield-checkmark', text: 'Firewall signature updated.', color: '#8B5CF6' },
 ];
 
-const NAV_TABS = [
-  { id: 'dashboard' as DashboardTab, icon: 'grid', label: 'Dashboard' },
-  { id: 'brokers' as DashboardTab, icon: 'list', label: 'Brokers' },
-  { id: 'alerts' as DashboardTab, icon: 'warning', label: 'Alerts' },
-  { id: 'settings' as DashboardTab, icon: 'settings', label: 'Settings' },
-];
 
 const severityColors: Record<Severity, string> = {
   critical: '#FF5470',
@@ -429,15 +421,7 @@ const PaywallStage = ({
   </View>
 );
 
-const DashboardStage = ({
-  activeTab,
-  onTabChange,
-  onRestart,
-}: {
-  activeTab: DashboardTab;
-  onTabChange: (tab: DashboardTab) => void;
-  onRestart: () => void;
-}) => (
+const DashboardStage = ({ onRestart }: { onRestart: () => void }) => (
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
       <View style={styles.navHeader}>
@@ -446,9 +430,6 @@ const DashboardStage = ({
           style={styles.logoImage}
           resizeMode="contain"
         />
-        <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
-          <Ionicons name="settings-outline" size={20} color="#ffffff" />
-        </Pressable>
       </View>
       <View style={styles.successRingWrapper}>
         <LinearGradient colors={[COLOR.successStart, COLOR.successEnd]} style={styles.successRingOuter}>
@@ -480,283 +461,9 @@ const DashboardStage = ({
       </GlassCard>
     </View>
     <View style={styles.dashboardActions}>
-      <GradientButton
-        label="View Settings"
-        colors={['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.08)']}
-        textColor="#ffffff"
-        onPress={() => onTabChange('settings')}
-      />
       <Pressable onPress={onRestart} style={styles.restartLink}>
         <Text style={styles.restartText}>Restart Detonation Flow</Text>
       </Pressable>
-      <GlassCard style={styles.navBar}>
-        {NAV_TABS.map((tab) => (
-          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
-            <Ionicons
-              name={tab.icon as any}
-              size={18}
-              color={activeTab === tab.id ? COLOR.nuclearStart : COLOR.textMuted}
-            />
-            <Text style={[styles.navLabel, activeTab === tab.id && { color: '#ffffff' }]}>{tab.label}</Text>
-          </Pressable>
-        ))}
-      </GlassCard>
-    </View>
-  </View>
-);
-
-const BrokersStage = ({
-  onTabChange,
-  onRestart,
-}: {
-  onTabChange: (tab: DashboardTab) => void;
-  onRestart: () => void;
-}) => (
-  <View style={[styles.stageBase, styles.stageSpacing]}>
-    <View>
-      <View style={styles.navHeader}>
-        <Image
-          source={require('@/assets/images/0tracelabs-logo-dark.png')}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-        <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
-          <Ionicons name="settings-outline" size={20} color="#ffffff" />
-        </Pressable>
-      </View>
-      <Text style={styles.headline}>BROKERS</Text>
-      <Text style={styles.subhead}>Data brokers blocked and monitored.</Text>
-
-      <GlassCard style={styles.evidenceCard}>
-        <Text style={styles.cardTitle}>Blocked Brokers</Text>
-        {BROKER_FINDINGS.map((broker) => (
-          <View key={broker.name} style={styles.evidenceRow}>
-            <View style={styles.evidenceIcon}>
-              <Ionicons name="shield-checkmark" size={18} color="#3DD598" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.evidenceTitle}>{broker.name}</Text>
-              <Text style={styles.evidenceDetail}>{broker.detail}</Text>
-            </View>
-            <Text style={[styles.evidenceBadge, { color: '#3DD598' }]}>BLOCKED</Text>
-          </View>
-        ))}
-      </GlassCard>
-
-      <GlassCard style={styles.liveLogCard}>
-        <Text style={styles.cardTitle}>Monitoring Activity</Text>
-        <View style={styles.logRow}>
-          <View style={[styles.logIcon, { backgroundColor: `${COLOR.nuclearStart}22` }]}>
-            <Ionicons name="eye" size={16} color={COLOR.nuclearStart} />
-          </View>
-          <Text style={styles.logText}>Scanning 512 brokers every hour</Text>
-        </View>
-        <View style={styles.logRow}>
-          <View style={[styles.logIcon, { backgroundColor: `${COLOR.successStart}22` }]}>
-            <Ionicons name="checkmark-circle" size={16} color={COLOR.successStart} />
-          </View>
-          <Text style={styles.logText}>Last scan: 2 minutes ago</Text>
-        </View>
-      </GlassCard>
-    </View>
-    <View style={styles.dashboardActions}>
-      <Pressable onPress={onRestart} style={styles.restartLink}>
-        <Text style={styles.restartText}>Restart Detonation Flow</Text>
-      </Pressable>
-      <GlassCard style={styles.navBar}>
-        {NAV_TABS.map((tab) => (
-          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
-            <Ionicons
-              name={tab.icon as any}
-              size={18}
-              color={tab.id === 'brokers' ? COLOR.nuclearStart : COLOR.textMuted}
-            />
-            <Text style={[styles.navLabel, tab.id === 'brokers' && { color: '#ffffff' }]}>{tab.label}</Text>
-          </Pressable>
-        ))}
-      </GlassCard>
-    </View>
-  </View>
-);
-
-const AlertsStage = ({
-  onTabChange,
-  onRestart,
-}: {
-  onTabChange: (tab: DashboardTab) => void;
-  onRestart: () => void;
-}) => (
-  <View style={[styles.stageBase, styles.stageSpacing]}>
-    <View>
-      <View style={styles.navHeader}>
-        <Image
-          source={require('@/assets/images/0tracelabs-logo-dark.png')}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-        <Pressable style={styles.navIcon} onPress={() => onTabChange('settings')}>
-          <Ionicons name="settings-outline" size={20} color="#ffffff" />
-        </Pressable>
-      </View>
-      <Text style={styles.headline}>ALERTS</Text>
-      <Text style={styles.subhead}>Security notifications and threats detected.</Text>
-
-      <GlassCard style={styles.evidenceCard}>
-        <Text style={styles.cardTitle}>Recent Alerts</Text>
-        {SCAN_EVENTS.slice(0, 5).map((event, idx) => (
-          <View key={`${event.name}-${idx}`} style={styles.evidenceRow}>
-            <View style={[styles.streamIcon, { backgroundColor: `${severityColors[event.severity]}22` }]}>
-              <Ionicons name="warning" size={18} color={severityColors[event.severity]} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.evidenceTitle}>{event.name}</Text>
-              <Text style={styles.evidenceDetail}>{event.detail}</Text>
-            </View>
-            <Text style={[styles.streamSeverity, { color: severityColors[event.severity] }]}>
-              {severityTitles[event.severity]}
-            </Text>
-          </View>
-        ))}
-      </GlassCard>
-
-      <GlassCard style={styles.liveLogCard}>
-        <Text style={styles.cardTitle}>Alert Settings</Text>
-        <View style={styles.logRow}>
-          <View style={[styles.logIcon, { backgroundColor: `${COLOR.successStart}22` }]}>
-            <Ionicons name="notifications" size={16} color={COLOR.successStart} />
-          </View>
-          <Text style={styles.logText}>Push notifications enabled</Text>
-        </View>
-        <View style={styles.logRow}>
-          <View style={[styles.logIcon, { backgroundColor: `${COLOR.nuclearStart}22` }]}>
-            <Ionicons name="shield" size={16} color={COLOR.nuclearStart} />
-          </View>
-          <Text style={styles.logText}>Critical alerts only mode active</Text>
-        </View>
-      </GlassCard>
-    </View>
-    <View style={styles.dashboardActions}>
-      <Pressable onPress={onRestart} style={styles.restartLink}>
-        <Text style={styles.restartText}>Restart Detonation Flow</Text>
-      </Pressable>
-      <GlassCard style={styles.navBar}>
-        {NAV_TABS.map((tab) => (
-          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
-            <Ionicons
-              name={tab.icon as any}
-              size={18}
-              color={tab.id === 'alerts' ? COLOR.nuclearStart : COLOR.textMuted}
-            />
-            <Text style={[styles.navLabel, tab.id === 'alerts' && { color: '#ffffff' }]}>{tab.label}</Text>
-          </Pressable>
-        ))}
-      </GlassCard>
-    </View>
-  </View>
-);
-
-const SettingsStage = ({
-  monitoringEnabled,
-  autoWipeEnabled,
-  stealthAlerts,
-  onToggleMonitoring,
-  onToggleAutoWipe,
-  onToggleStealth,
-  onTabChange,
-  onRestart,
-  onLogout,
-}: {
-  monitoringEnabled: boolean;
-  autoWipeEnabled: boolean;
-  stealthAlerts: boolean;
-  onToggleMonitoring: () => void;
-  onToggleAutoWipe: () => void;
-  onToggleStealth: () => void;
-  onTabChange: (tab: DashboardTab) => void;
-  onRestart: () => void;
-  onLogout?: () => void;
-}) => (
-  <View style={[styles.stageBase, styles.stageSpacing]}>
-    <View>
-      <Text style={styles.sectionLabel}>Secure Settings</Text>
-      <Text style={styles.subhead}>Tune detonation policy, notifications, and monitoring cadence.</Text>
-      <GlassCard style={styles.settingsCard}>
-        <View style={styles.settingRow}>
-          <View style={styles.settingCopy}>
-            <Text style={styles.settingTitle}>Live Monitoring</Text>
-            <Text style={styles.settingDetail}>24/7 data broker sweeps.</Text>
-          </View>
-          <Switch
-            value={monitoringEnabled}
-            onValueChange={onToggleMonitoring}
-            trackColor={{ false: 'rgba(255,255,255,0.2)', true: COLOR.nuclearEnd }}
-            thumbColor={monitoringEnabled ? '#ffffff' : '#6B7280'}
-            ios_backgroundColor="rgba(255,255,255,0.2)"
-          />
-        </View>
-        <View style={styles.settingRow}>
-          <View style={styles.settingCopy}>
-            <Text style={styles.settingTitle}>Auto Wipe</Text>
-            <Text style={styles.settingDetail}>Instant detonation when new traces appear.</Text>
-          </View>
-          <Switch
-            value={autoWipeEnabled}
-            onValueChange={onToggleAutoWipe}
-            trackColor={{ false: 'rgba(255,255,255,0.2)', true: COLOR.warningEnd }}
-            thumbColor={autoWipeEnabled ? '#ffffff' : '#6B7280'}
-            ios_backgroundColor="rgba(255,255,255,0.2)"
-          />
-        </View>
-        <View style={styles.settingRow}>
-          <View style={styles.settingCopy}>
-            <Text style={styles.settingTitle}>Stealth Alerts</Text>
-            <Text style={styles.settingDetail}>Only notify on critical broker events.</Text>
-          </View>
-          <Switch
-            value={stealthAlerts}
-            onValueChange={onToggleStealth}
-            trackColor={{ false: 'rgba(255,255,255,0.2)', true: COLOR.successStart }}
-            thumbColor={stealthAlerts ? '#ffffff' : '#6B7280'}
-            ios_backgroundColor="rgba(255,255,255,0.2)"
-          />
-        </View>
-      </GlassCard>
-
-      <GlassCard style={styles.logsCard}>
-        <Text style={styles.cardTitle}>Detonation Logs</Text>
-        <View style={styles.logRow}>
-          <Text style={styles.logText}>342 Records nuked • Last detonation: 12m ago</Text>
-        </View>
-        <View style={styles.logRow}>
-          <Text style={styles.logText}>Monitoring cadence: 15 min</Text>
-        </View>
-      </GlassCard>
-    </View>
-    <View style={styles.dashboardActions}>
-      <GradientButton
-        label="Back to Dashboard"
-        colors={[COLOR.nuclearStart, COLOR.nuclearEnd]}
-        textColor="#02101F"
-        onPress={() => onTabChange('dashboard')}
-      />
-      <Pressable style={styles.dangerButton} onPress={onLogout}>
-        <Text style={styles.dangerButtonText}>SIGN OUT</Text>
-      </Pressable>
-      <Pressable onPress={onRestart} style={styles.restartLink}>
-        <Text style={styles.restartText}>Restart Detonation Flow</Text>
-      </Pressable>
-      <GlassCard style={styles.navBar}>
-        {NAV_TABS.map((tab) => (
-          <Pressable key={tab.id} style={styles.navTab} onPress={() => onTabChange(tab.id)}>
-            <Ionicons
-              name={tab.icon as any}
-              size={18}
-              color={tab.id === 'settings' ? COLOR.nuclearStart : COLOR.textMuted}
-            />
-            <Text style={[styles.navLabel, tab.id === 'settings' && { color: '#ffffff' }]}>{tab.label}</Text>
-          </Pressable>
-        ))}
-      </GlassCard>
     </View>
   </View>
 );
@@ -764,15 +471,10 @@ const SettingsStage = ({
 export default function HomeScreen() {
   const { welcomeCompleted, completeWelcome, initialize: initializeOnboarding } = useOnboardingStore();
   const [stage, setStage] = useState<ExperienceStage>('welcome');
-  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('dashboard');
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('annual');
-  const [monitoringEnabled, setMonitoringEnabled] = useState(true);
-  const [autoWipeEnabled, setAutoWipeEnabled] = useState(true);
-  const [stealthAlerts, setStealthAlerts] = useState(true);
   const [scanProgress, setScanProgress] = useState(12);
   const [scanMessage, setScanMessage] = useState(SCAN_MESSAGES[0]);
   const [scanStream, setScanStream] = useState<ScanEvent[]>([]);
-  const { signOut } = useAuthStore();
 
   // Initialize onboarding state and set initial stage
   useEffect(() => {
@@ -828,15 +530,6 @@ export default function HomeScreen() {
     };
   }, [stage]);
 
-  const handleTabChange = (tab: DashboardTab) => {
-    setActiveDashboardTab(tab);
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    router.replace('/auth/login' as any);
-  };
-
   const renderStage = () => {
     switch (stage) {
       case 'welcome':
@@ -853,55 +546,11 @@ export default function HomeScreen() {
             onActivate={() => {
               completeWelcome();
               setStage('dashboard');
-              setActiveDashboardTab('dashboard');
             }}
           />
         );
       case 'dashboard':
-        switch (activeDashboardTab) {
-          case 'dashboard':
-            return (
-              <DashboardStage
-                activeTab={activeDashboardTab}
-                onTabChange={handleTabChange}
-                onRestart={() => setStage('welcome')}
-              />
-            );
-          case 'brokers':
-            return <BrokersStage onTabChange={handleTabChange} onRestart={() => setStage('welcome')} />;
-          case 'alerts':
-            return <AlertsStage onTabChange={handleTabChange} onRestart={() => setStage('welcome')} />;
-          case 'settings':
-            return (
-              <SettingsStage
-                monitoringEnabled={monitoringEnabled}
-                autoWipeEnabled={autoWipeEnabled}
-                stealthAlerts={stealthAlerts}
-                onToggleMonitoring={() => setMonitoringEnabled((prev) => !prev)}
-                onToggleAutoWipe={() => setAutoWipeEnabled((prev) => !prev)}
-                onToggleStealth={() => setStealthAlerts((prev) => !prev)}
-                onTabChange={handleTabChange}
-                onRestart={() => setStage('welcome')}
-                onLogout={handleLogout}
-              />
-            );
-          default:
-            return null;
-        }
-      case 'settings':
-        return (
-          <SettingsStage
-            monitoringEnabled={monitoringEnabled}
-            autoWipeEnabled={autoWipeEnabled}
-            stealthAlerts={stealthAlerts}
-            onToggleMonitoring={() => setMonitoringEnabled((prev) => !prev)}
-            onToggleAutoWipe={() => setAutoWipeEnabled((prev) => !prev)}
-            onToggleStealth={() => setStealthAlerts((prev) => !prev)}
-            onTabChange={handleTabChange}
-            onRestart={() => setStage('welcome')}
-            onLogout={handleLogout}
-          />
-        );
+        return <DashboardStage onRestart={() => setStage('welcome')} />;
       default:
         return null;
     }
@@ -1319,15 +968,6 @@ const styles = StyleSheet.create({
     height: 32,
     width: 120,
   },
-  navIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLOR.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   successRingWrapper: {
     alignItems: 'center',
     marginBottom: 16,
@@ -1397,61 +1037,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     color: '#8B93B6',
     textDecorationLine: 'underline',
-  },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  navTab: {
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  navLabel: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 12,
-  },
-  settingsCard: {
-    gap: 20,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  settingCopy: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    fontSize: 16,
-  },
-  settingDetail: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  logsCard: {
-    marginTop: 24,
-    gap: 8,
-  },
-  dangerButton: {
-    marginTop: 16,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#FF5470',
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  dangerButtonText: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#FF5470',
-    letterSpacing: 1,
   },
 });
 
