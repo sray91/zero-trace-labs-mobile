@@ -77,7 +77,7 @@ To enable full functionality, configure these settings in your Supabase dashboar
 3. **URL Configuration**
    Add these URLs to "Redirect URLs" in Supabase:
    ```
-   0tracelabsmobile://reset-password
+   zerotracelabsmobile://reset-password
    ```
 
 ### Security Features
