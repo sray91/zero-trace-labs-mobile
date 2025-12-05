@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "0Trace Labs",
-    "slug": "0tracelabs-mobile",
+    "slug": "0tracelabs",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "0tracelabsmobile",
+    "scheme": "zerotracelabsmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -63,8 +63,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "YOUR_PROJECT_ID_HERE"
-      }
-    }
+        "projectId": "4fb74c1a-28cc-485d-98aa-730ffd3317d0"
+      },
+      "router": {}
+    },
+    "owner": "sray91"
   }
 }
