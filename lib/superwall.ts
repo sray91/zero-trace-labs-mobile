@@ -1,5 +1,10 @@
-import Superwall from '@superwall/react-native-superwall';
 import { Platform } from 'react-native';
+
+// Only import Superwall on native platforms (iOS/Android)
+// Web doesn't support native modules
+const Superwall = Platform.OS !== 'web'
+  ? require('@superwall/react-native-superwall').default
+  : null;
 
 const SUPERWALL_API_KEY = process.env.EXPO_PUBLIC_SUPERWALL_API_KEY || '';
 
@@ -12,7 +17,16 @@ export interface SuperwallConfig {
 class SuperwallService {
   private initialized = false;
 
+  private isSupported(): boolean {
+    return Platform.OS !== 'web' && Superwall !== null;
+  }
+
   async initialize(config: SuperwallConfig) {
+    if (!this.isSupported()) {
+      console.log('Superwall not supported on this platform');
+      return;
+    }
+
     if (this.initialized) {
       console.log('Superwall already initialized');
       return;
@@ -41,6 +55,8 @@ class SuperwallService {
   }
 
   async identify(userId: string, attributes?: Record<string, any>) {
+    if (!this.isSupported()) return;
+
     try {
       await Superwall.identify(userId);
 
@@ -55,6 +71,8 @@ class SuperwallService {
   }
 
   async setUserAttributes(attributes: Record<string, any>) {
+    if (!this.isSupported()) return;
+
     try {
       await Superwall.setUserAttributes(attributes);
       console.log('Superwall user attributes updated');
@@ -64,6 +82,8 @@ class SuperwallService {
   }
 
   async reset() {
+    if (!this.isSupported()) return;
+
     try {
       await Superwall.reset();
       console.log('Superwall user reset');
@@ -73,6 +93,8 @@ class SuperwallService {
   }
 
   async registerEvent(eventName: string, params?: Record<string, any>) {
+    if (!this.isSupported()) return;
+
     try {
       await Superwall.register(eventName, params);
       console.log('Superwall event registered:', eventName, params);
@@ -87,6 +109,11 @@ class SuperwallService {
    * @param params - Optional parameters to pass to the paywall
    */
   async presentPaywall(placement: string, params?: Record<string, any>) {
+    if (!this.isSupported()) {
+      console.log('Superwall not supported on this platform');
+      return;
+    }
+
     try {
       const result = await Superwall.register(placement, params);
       console.log('Paywall presentation result:', result);
@@ -101,6 +128,8 @@ class SuperwallService {
    * Dismiss the currently presented paywall
    */
   async dismissPaywall() {
+    if (!this.isSupported()) return;
+
     try {
       await Superwall.dismiss();
       console.log('Paywall dismissed');

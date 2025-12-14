@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, ActivityIndicator, Alert, Pressable, ScrollView } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { whopService, WHOP_PLANS, PLAN_INFO } from '@/lib/whop';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { PLAN_INFO, WHOP_PLANS, whopService } from '@/lib/whop';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 interface WhopPaywallProps {
   onSuccess?: () => void;
@@ -78,17 +78,14 @@ export function WhopPaywall({ onSuccess, onDismiss }: WhopPaywallProps) {
     setIsLoading(false);
     setPollingForSubscription(true);
 
-    let attempts = 0;
     const maxAttempts = 20; // 40 seconds total (20 attempts * 2 seconds)
 
-    const pollInterval = setInterval(async () => {
-      attempts++;
-      console.log(`Polling for subscription (${attempts}/${maxAttempts})`);
+    const poll = async (attempt: number) => {
+      console.log(`Polling for subscription (${attempt}/${maxAttempts})`);
 
       await fetchCustomer(user.id);
 
       if (hasActiveSubscription()) {
-        clearInterval(pollInterval);
         setPollingForSubscription(false);
 
         Alert.alert(
@@ -96,8 +93,7 @@ export function WhopPaywall({ onSuccess, onDismiss }: WhopPaywallProps) {
           'Your subscription is now active!',
           [{ text: 'Continue', onPress: () => onSuccess?.() }]
         );
-      } else if (attempts >= maxAttempts) {
-        clearInterval(pollInterval);
+      } else if (attempt >= maxAttempts) {
         setPollingForSubscription(false);
 
         Alert.alert(
@@ -105,8 +101,14 @@ export function WhopPaywall({ onSuccess, onDismiss }: WhopPaywallProps) {
           'Your payment is being processed. You should have access within a few minutes.',
           [{ text: 'OK', onPress: () => onDismiss?.() }]
         );
+      } else {
+        // Schedule next poll only after current fetch completes
+        setTimeout(() => poll(attempt + 1), 2000);
       }
-    }, 2000);
+    };
+
+    // Start polling
+    poll(1);
   };
 
   if (pollingForSubscription) {

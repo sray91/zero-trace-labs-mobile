@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, Alert, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { superwallService } from '@/lib/superwall';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
-import { router } from 'expo-router';
-import Superwall from '@superwall/react-native-superwall';
+import { superwallService } from '@/lib/superwall';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
+
+// Only import Superwall on native platforms
+const Superwall = Platform.OS !== 'web'
+  ? require('@superwall/react-native-superwall').default
+  : null;
 
 interface SuperwallPaywallProps {
   placement?: string;
@@ -41,12 +44,15 @@ export function SuperwallPaywall({
   const [pollingForSubscription, setPollingForSubscription] = useState(false);
 
   useEffect(() => {
+    // Superwall is only available on native platforms
+    if (Platform.OS === 'web' || !Superwall) return;
+
     // Set up Superwall event listeners
     const setupListeners = async () => {
       // Listen for paywall events
       Superwall.shared.delegate = {
         // Called when user completes a purchase
-        handleSuperwallEvent: async (event) => {
+        handleSuperwallEvent: async (event: { type: string }) => {
           console.log('Superwall event:', event);
 
           if (event.type === 'transaction_complete') {
@@ -59,7 +65,7 @@ export function SuperwallPaywall({
         },
 
         // Called when purchase flow fails
-        handlePurchaseError: (error) => {
+        handlePurchaseError: (error: { message?: string }) => {
           console.error('Purchase error:', error);
           Alert.alert(
             'Purchase Failed',
@@ -81,17 +87,14 @@ export function SuperwallPaywall({
 
     // Poll the database for subscription status
     // The webhook should update the customers table within a few seconds
-    let attempts = 0;
     const maxAttempts = 15; // 30 seconds total (15 attempts * 2 seconds)
 
-    const pollInterval = setInterval(async () => {
-      attempts++;
-      console.log(`Polling for subscription status (attempt ${attempts}/${maxAttempts})`);
+    const poll = async (attempt: number) => {
+      console.log(`Polling for subscription status (attempt ${attempt}/${maxAttempts})`);
 
       await fetchCustomer(user.id);
 
       if (hasActiveSubscription()) {
-        clearInterval(pollInterval);
         setPollingForSubscription(false);
         setIsLoading(false);
 
@@ -100,8 +103,7 @@ export function SuperwallPaywall({
           'Your subscription is now active. Welcome to 0Trace Labs!',
           [{ text: 'Continue', onPress: () => onSuccess?.() }]
         );
-      } else if (attempts >= maxAttempts) {
-        clearInterval(pollInterval);
+      } else if (attempt >= maxAttempts) {
         setPollingForSubscription(false);
         setIsLoading(false);
 
@@ -110,8 +112,14 @@ export function SuperwallPaywall({
           'Your payment is being processed. You should have access within a few minutes. Please check back shortly.',
           [{ text: 'OK', onPress: () => onDismiss?.() }]
         );
+      } else {
+        // Schedule next poll only after current fetch completes
+        setTimeout(() => poll(attempt + 1), 2000);
       }
-    }, 2000);
+    };
+
+    // Start polling
+    poll(1);
   };
 
   const presentPaywall = async () => {

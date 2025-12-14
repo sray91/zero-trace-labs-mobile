@@ -67,6 +67,12 @@
       },
       "router": {}
     },
-    "owner": "sray91"
+    "owner": "sray91",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4fb74c1a-28cc-485d-98aa-730ffd3317d0"
+    }
   }
 }
