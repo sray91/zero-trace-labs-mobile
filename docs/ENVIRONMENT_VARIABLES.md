@@ -27,6 +27,9 @@ Variables prefixed with `EXPO_PUBLIC_` are:
 # ✅ GOOD - Public, client-safe keys
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+EXPO_PUBLIC_SUPERWALL_API_KEY=pk_live_xxx
+EXPO_PUBLIC_WHOP_ANNUAL_PLAN_ID=plan_xxx
+EXPO_PUBLIC_WHOP_MONTHLY_PLAN_ID=plan_yyy
 
 # ❌ BAD - Never expose server secrets with EXPO_PUBLIC_
 EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your_secret_key  # DON'T DO THIS!
@@ -225,6 +228,21 @@ Your app is configured with:
 - ✅ `eas.json` with production environment variables
 - ✅ `.env.example` for team onboarding
 - ✅ `.env` in `.gitignore`
+
+### Required Environment Variables
+
+```bash
+# Supabase (Authentication & Database)
+EXPO_PUBLIC_SUPABASE_URL=https://tdfjmlbzabpjazczbdud.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+
+# Superwall (Paywall Management)
+EXPO_PUBLIC_SUPERWALL_API_KEY=pk_live_xxx
+
+# Whop (Payment Processing)
+EXPO_PUBLIC_WHOP_ANNUAL_PLAN_ID=plan_annual_xxx
+EXPO_PUBLIC_WHOP_MONTHLY_PLAN_ID=plan_monthly_xxx
+```
 
 ## Next Steps
 

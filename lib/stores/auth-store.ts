@@ -1,6 +1,8 @@
 import { AuthError, Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 import { supabase } from '../supabase';
+import { useSubscriptionStore } from './subscription-store';
+import { superwallService } from '../superwall';
 
 interface AuthState {
   session: Session | null;
@@ -77,7 +79,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signOut: async () => {
     set({ loading: true });
+
+    // Clean up subscription store
+    useSubscriptionStore.getState().reset();
+
+    // Reset Superwall user
+    await superwallService.reset();
+
+    // Sign out from Supabase
     await supabase.auth.signOut();
+
     set({ session: null, user: null, loading: false });
   },
 

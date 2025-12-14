@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,7 +10,16 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, initialized } = useAuthStore();
+  const { fetchCustomer, subscribeToChanges } = useSubscriptionStore();
   const segments = useSegments();
+
+  // Fetch customer data when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      fetchCustomer(user.id);
+      subscribeToChanges(user.id);
+    }
+  }, [user?.id, fetchCustomer, subscribeToChanges]);
 
   useEffect(() => {
     if (!initialized) return;

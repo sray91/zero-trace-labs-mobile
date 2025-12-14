@@ -17,11 +17,13 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 import { router } from 'expo-router';
+import { WhopPaywall } from '@/components/paywall/whop-paywall';
 
 type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard';
 type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-type PlanId = 'annual' | 'monthly';
+type PlanId = 'free' | 'basic' | 'premium';
 
 interface ScanEvent {
   name: string;
@@ -91,22 +93,32 @@ const BROKER_FINDINGS = [
 
 const PLAN_CARDS: PlanCard[] = [
   {
-    id: 'annual',
-    title: 'ANNUAL NUKE',
-    ribbon: 'MOST POPULAR',
-    price: '$19/mo',
-    cadence: 'Billed annually',
-    blurb: 'Unlimited wipes + live monitoring',
-    perks: ['Monthly detonation sweeps', '24/7 broker blocking', 'Swiss data residency'],
+    id: 'free',
+    title: 'FREE TRIAL',
+    ribbon: 'START HERE',
+    price: 'Free',
+    cadence: '7-day trial',
+    blurb: 'Try before you commit',
+    perks: ['Basic scans', 'Limited removals', 'No credit card required'],
+    accent: COLOR.successStart,
+  },
+  {
+    id: 'basic',
+    title: 'BASIC',
+    price: '$14.99/mo',
+    cadence: 'Billed monthly',
+    blurb: 'Essential protection',
+    perks: ['Monthly detonation sweeps', 'Standard broker blocking', 'Email support'],
     accent: COLOR.nuclearStart,
   },
   {
-    id: 'monthly',
-    title: 'MONTHLY STRIKE',
-    price: '$29/mo',
+    id: 'premium',
+    title: 'PREMIUM',
+    ribbon: 'MOST POPULAR',
+    price: '$29.99/mo',
     cadence: 'Billed monthly',
-    blurb: 'Cancel anytime, full arsenal access',
-    perks: ['On-demand wipes', 'Dark web surveillance', 'Priority response'],
+    blurb: 'Maximum protection',
+    perks: ['On-demand wipes', 'Dark web surveillance', 'Priority response', '24/7 monitoring'],
     accent: COLOR.warningEnd,
   },
 ];
@@ -470,23 +482,25 @@ const DashboardStage = ({ onRestart }: { onRestart: () => void }) => (
 
 export default function HomeScreen() {
   const { welcomeCompleted, completeWelcome, initialize: initializeOnboarding } = useOnboardingStore();
+  const { hasActiveSubscription, customer } = useSubscriptionStore();
   const [stage, setStage] = useState<ExperienceStage>('welcome');
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>('annual');
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>('free');
   const [scanProgress, setScanProgress] = useState(12);
   const [scanMessage, setScanMessage] = useState(SCAN_MESSAGES[0]);
   const [scanStream, setScanStream] = useState<ScanEvent[]>([]);
+  const [showWhopPaywall, setShowWhopPaywall] = useState(false);
 
   // Initialize onboarding state and set initial stage
   useEffect(() => {
     initializeOnboarding();
   }, [initializeOnboarding]);
 
-  // Skip to dashboard if welcome already completed
+  // Skip to dashboard if welcome already completed AND has active subscription
   useEffect(() => {
-    if (welcomeCompleted && stage === 'welcome') {
+    if (welcomeCompleted && hasActiveSubscription() && stage === 'welcome') {
       setStage('dashboard');
     }
-  }, [welcomeCompleted, stage]);
+  }, [welcomeCompleted, hasActiveSubscription, stage]);
 
   useEffect(() => {
     let progressTimer: ReturnType<typeof setInterval> | undefined;
@@ -531,6 +545,23 @@ export default function HomeScreen() {
   }, [stage]);
 
   const renderStage = () => {
+    // Show Whop paywall if triggered
+    if (showWhopPaywall) {
+      return (
+        <WhopPaywall
+          onSuccess={() => {
+            setShowWhopPaywall(false);
+            completeWelcome();
+            setStage('dashboard');
+          }}
+          onDismiss={() => {
+            setShowWhopPaywall(false);
+            // Keep them on paywall stage if they dismiss
+          }}
+        />
+      );
+    }
+
     switch (stage) {
       case 'welcome':
         return <WelcomeStage onStart={() => setStage('scan')} />;
@@ -539,15 +570,37 @@ export default function HomeScreen() {
       case 'results':
         return <ResultsStage onDetonate={() => setStage('paywall')} />;
       case 'paywall':
+        // Show button to trigger Superwall instead of mock paywall
         return (
-          <PaywallStage
-            selectedPlan={selectedPlan}
-            onSelectPlan={setSelectedPlan}
-            onActivate={() => {
-              completeWelcome();
-              setStage('dashboard');
-            }}
-          />
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLOR.deepVoid, padding: 20 }}>
+            <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>
+              AUTHORIZE DETONATION
+            </Text>
+            <Text style={{ color: COLOR.textMuted, marginBottom: 32, textAlign: 'center' }}>
+              Choose your plan to activate and wipe your data
+            </Text>
+            <Pressable
+              onPress={() => setShowWhopPaywall(true)}
+              style={{
+                backgroundColor: COLOR.nuclearStart,
+                paddingHorizontal: 32,
+                paddingVertical: 16,
+                borderRadius: 12,
+                minWidth: 250,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#02101F', fontWeight: 'bold', fontSize: 16 }}>
+                VIEW PRICING OPTIONS
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setStage('results')}
+              style={{ marginTop: 20 }}
+            >
+              <Text style={{ color: COLOR.textMuted, fontSize: 14 }}>← Go Back</Text>
+            </Pressable>
+          </View>
         );
       case 'dashboard':
         return <DashboardStage onRestart={() => setStage('welcome')} />;
