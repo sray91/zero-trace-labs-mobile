@@ -1,4 +1,4 @@
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { useClerkAuth } from '@/lib/stores/auth-store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -70,11 +70,11 @@ export default function SettingsScreen() {
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <Text style={styles.avatarText}>
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
+                {user?.primaryEmailAddress?.emailAddress?.charAt(0).toUpperCase() || 'U'}
               </Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileEmail}>{user?.email || 'No email'}</Text>
+              <Text style={styles.profileEmail}>{user?.primaryEmailAddress?.emailAddress || 'No email'}</Text>
               <Text style={styles.profileId}>ID: {user?.id?.slice(0, 8) || 'N/A'}</Text>
             </View>
           </View>
@@ -86,8 +86,8 @@ export default function SettingsScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {user?.created_at
-                  ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                {user?.createdAt
+                  ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                   : 'N/A'}
               </Text>
               <Text style={styles.statLabel}>Member Since</Text>

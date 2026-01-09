@@ -1,3 +1,11 @@
+import { RevenueCatPaywall } from '@/components/paywall/paywall';
+import { revenueCatService } from '@/lib/revenue-cat';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { useOnboardingStore } from '@/lib/stores/onboarding-store';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -7,39 +15,18 @@ import {
   ScrollView,
   StyleProp,
   StyleSheet,
-  Switch,
   Text,
   View,
-  ViewStyle,
+  ViewStyle
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '@/lib/stores/auth-store';
-import { useOnboardingStore } from '@/lib/stores/onboarding-store';
-import { useSubscriptionStore } from '@/lib/stores/subscription-store';
-import { router } from 'expo-router';
-import { WhopPaywall } from '@/components/paywall/whop-paywall';
 
 type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard';
 type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-type PlanId = 'free' | 'basic' | 'premium';
 
 interface ScanEvent {
   name: string;
   detail: string;
   severity: Severity;
-}
-
-interface PlanCard {
-  id: PlanId;
-  title: string;
-  ribbon?: string;
-  price: string;
-  cadence: string;
-  blurb: string;
-  perks: string[];
-  accent: string;
 }
 
 const COLOR = {
@@ -89,44 +76,6 @@ const BROKER_FINDINGS = [
   { name: 'PeopleFinder', detail: 'Contains: Phone, Relatives', type: 'Broker' },
   { name: 'Dark Web Exchange', detail: 'Contains: Credentials, IP', type: 'Dark Web' },
   { name: 'LexisNexis', detail: 'Contains: Financial Records', type: 'Broker' },
-];
-
-const PLAN_CARDS: PlanCard[] = [
-  {
-    id: 'free',
-    title: 'FREE TRIAL',
-    ribbon: 'START HERE',
-    price: 'Free',
-    cadence: '7-day trial',
-    blurb: 'Try before you commit',
-    perks: ['Basic scans', 'Limited removals', 'No credit card required'],
-    accent: COLOR.successStart,
-  },
-  {
-    id: 'basic',
-    title: 'BASIC',
-    price: '$14.99/mo',
-    cadence: 'Billed monthly',
-    blurb: 'Essential protection',
-    perks: ['Monthly detonation sweeps', 'Standard broker blocking', 'Email support'],
-    accent: COLOR.nuclearStart,
-  },
-  {
-    id: 'premium',
-    title: 'PREMIUM',
-    ribbon: 'MOST POPULAR',
-    price: '$29.99/mo',
-    cadence: 'Billed monthly',
-    blurb: 'Maximum protection',
-    perks: ['On-demand wipes', 'Dark web surveillance', 'Priority response', '24/7 monitoring'],
-    accent: COLOR.warningEnd,
-  },
-];
-
-const TRUST_BENEFITS = [
-  { icon: 'lock-closed', label: 'Encrypted Payment' },
-  { icon: 'shield-checkmark', label: 'Swiss-Based' },
-  { icon: 'checkmark-circle', label: 'No Logs' },
 ];
 
 const DASHBOARD_METRICS = [
@@ -363,69 +312,28 @@ const ResultsStage = ({ onDetonate }: { onDetonate: () => void }) => (
 );
 
 const PaywallStage = ({
-  selectedPlan,
-  onSelectPlan,
   onActivate,
 }: {
-  selectedPlan: PlanId;
-  onSelectPlan: (plan: PlanId) => void;
   onActivate: () => void;
 }) => (
   <View style={[styles.stageBase, styles.stageSpacing]}>
     <View>
       <Text style={styles.sectionLabel}>AUTHORIZE DETONATION</Text>
       <Text style={styles.subhead}>To wipe these records and monitor for reappearance, activate 0Trace Prime.</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.planScroll}
-        snapToAlignment="center"
-        decelerationRate="fast"
-      >
-        {PLAN_CARDS.map((plan) => {
-          const isSelected = selectedPlan === plan.id;
-          return (
-            <Pressable key={plan.id} onPress={() => onSelectPlan(plan.id)} style={styles.planPressable}>
-              <GlassCard
-                style={[
-                  styles.planCard,
-                  { borderColor: plan.accent },
-                  isSelected && styles.planCardSelected,
-                ]}
-              >
-                {plan.ribbon ? (
-                  <View style={[styles.planRibbon, { backgroundColor: plan.accent }]}>
-                    <Text style={styles.planRibbonText}>{plan.ribbon}</Text>
-                  </View>
-                ) : null}
-                <Text style={styles.planTitle}>{plan.title}</Text>
-                <Text style={styles.planPrice}>{plan.price}</Text>
-                <Text style={styles.planCadence}>{plan.cadence}</Text>
-                <Text style={styles.planBlurb}>{plan.blurb}</Text>
-                <View style={styles.planPerks}>
-                  {plan.perks.map((perk) => (
-                    <View key={perk} style={styles.planPerkRow}>
-                      <Ionicons name="checkmark-circle" size={16} color={plan.accent} />
-                      <Text style={styles.planPerkText}>{perk}</Text>
-                    </View>
-                  ))}
-                </View>
-              </GlassCard>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      <GlassCard style={styles.trustBar}>
-        {TRUST_BENEFITS.map((benefit) => (
-          <View key={benefit.label} style={styles.trustItem}>
-            <Ionicons name={benefit.icon as any} size={16} color={COLOR.nuclearStart} />
-            <Text style={styles.trustText}>{benefit.label}</Text>
-          </View>
-        ))}
-      </GlassCard>
+      <View style={{ padding: 20, alignItems: 'center' }}>
+        <GlassCard style={{ width: '100%', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="shield-checkmark" size={48} color={COLOR.nuclearStart} style={{ marginBottom: 16 }} />
+          <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>
+            Secure Your Privacy
+          </Text>
+          <Text style={{ color: COLOR.textMuted, textAlign: 'center' }}>
+            Choose a plan that fits your needs to remove your data from data brokers.
+          </Text>
+        </GlassCard>
+      </View>
     </View>
     <GradientButton
-      label="ACTIVATE & WIPE NOW"
+      label="VIEW PLANS"
       colors={[COLOR.nuclearStart, COLOR.nuclearEnd]}
       textColor="#02101F"
       onPress={onActivate}
@@ -481,14 +389,23 @@ const DashboardStage = ({ onRestart }: { onRestart: () => void }) => (
 );
 
 export default function HomeScreen() {
+  const { user } = useAuthStore();
   const { welcomeCompleted, completeWelcome, initialize: initializeOnboarding } = useOnboardingStore();
-  const { hasActiveSubscription, customer } = useSubscriptionStore();
+  const { hasActiveSubscription } = useSubscriptionStore();
   const [stage, setStage] = useState<ExperienceStage>('welcome');
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>('free');
   const [scanProgress, setScanProgress] = useState(12);
   const [scanMessage, setScanMessage] = useState(SCAN_MESSAGES[0]);
   const [scanStream, setScanStream] = useState<ScanEvent[]>([]);
-  const [showWhopPaywall, setShowWhopPaywall] = useState(false);
+  const [showRevenueCatPaywall, setShowRevenueCatPaywall] = useState(false);
+
+  // Initialize RevenueCat
+  useEffect(() => {
+    if (user?.id) {
+      revenueCatService.initialize(user.id);
+    } else {
+      revenueCatService.initialize();
+    }
+  }, [user?.id]);
 
   // Initialize onboarding state and set initial stage
   useEffect(() => {
@@ -545,18 +462,15 @@ export default function HomeScreen() {
   }, [stage]);
 
   const renderStage = () => {
-    // Show Whop paywall if triggered
-    if (showWhopPaywall) {
+    // Show RevenueCat paywall if triggered
+    if (showRevenueCatPaywall) {
       return (
-        <WhopPaywall
+        <RevenueCatPaywall
+          onDismiss={() => setShowRevenueCatPaywall(false)}
           onSuccess={() => {
-            setShowWhopPaywall(false);
+            setShowRevenueCatPaywall(false);
             completeWelcome();
             setStage('dashboard');
-          }}
-          onDismiss={() => {
-            setShowWhopPaywall(false);
-            // Keep them on paywall stage if they dismiss
           }}
         />
       );
@@ -570,38 +484,7 @@ export default function HomeScreen() {
       case 'results':
         return <ResultsStage onDetonate={() => setStage('paywall')} />;
       case 'paywall':
-        // Show button to trigger Superwall instead of mock paywall
-        return (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLOR.deepVoid, padding: 20 }}>
-            <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>
-              AUTHORIZE DETONATION
-            </Text>
-            <Text style={{ color: COLOR.textMuted, marginBottom: 32, textAlign: 'center' }}>
-              Choose your plan to activate and wipe your data
-            </Text>
-            <Pressable
-              onPress={() => setShowWhopPaywall(true)}
-              style={{
-                backgroundColor: COLOR.nuclearStart,
-                paddingHorizontal: 32,
-                paddingVertical: 16,
-                borderRadius: 12,
-                minWidth: 250,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#02101F', fontWeight: 'bold', fontSize: 16 }}>
-                VIEW PRICING OPTIONS
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setStage('results')}
-              style={{ marginTop: 20 }}
-            >
-              <Text style={{ color: COLOR.textMuted, fontSize: 14 }}>← Go Back</Text>
-            </Pressable>
-          </View>
-        );
+        return <PaywallStage onActivate={() => setShowRevenueCatPaywall(true)} />;
       case 'dashboard':
         return <DashboardStage onRestart={() => setStage('welcome')} />;
       default:
@@ -801,30 +684,29 @@ const styles = StyleSheet.create({
     borderRadius: 120,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
   },
   progressGradient: {
     width: '100%',
     height: '100%',
     borderRadius: 120,
     padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   progressHollow: {
-    flex: 1,
+    width: 220,
+    height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(12, 14, 26, 0.9)',
+    backgroundColor: COLOR.deepVoid,
   },
   progressInner: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(12,14,26,0.9)',
-    alignItems: 'center',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
   },
   progressValue: {
     fontFamily: 'Outfit_800ExtraBold',
@@ -833,10 +715,9 @@ const styles = StyleSheet.create({
   },
   progressMessage: {
     fontFamily: 'Inter_500Medium',
-    color: COLOR.textMuted,
     fontSize: 14,
+    color: COLOR.nuclearStart,
     marginTop: 8,
-    textAlign: 'center',
   },
   streamContainer: {
     gap: 12,
@@ -844,80 +725,82 @@ const styles = StyleSheet.create({
   streamRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
+    padding: 12,
   },
   streamIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   streamCopy: {
     flex: 1,
   },
   streamTitle: {
-    fontFamily: 'Outfit_600SemiBold',
+    fontFamily: 'Inter_600SemiBold',
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
   },
   streamDetail: {
     fontFamily: 'Inter_400Regular',
     color: COLOR.textMuted,
     fontSize: 12,
-    marginTop: 2,
   },
   streamSeverity: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 10,
     letterSpacing: 1,
   },
   footerCaption: {
     fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 12,
-    letterSpacing: 1,
     textAlign: 'center',
   },
   metricValue: {
     fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 72,
-    color: '#FF5470',
+    fontSize: 56,
+    color: COLOR.warningEnd,
+    lineHeight: 56,
+    marginBottom: 4,
   },
   metricLabel: {
     fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    fontSize: 16,
-    letterSpacing: 4,
-    marginTop: 8,
+    fontSize: 14,
+    color: COLOR.textMuted,
+    letterSpacing: 2,
+    marginBottom: 16,
   },
   evidenceCard: {
-    marginTop: 32,
-    gap: 16,
+    marginTop: 24,
+    overflow: 'hidden',
   },
   cardTitle: {
     fontFamily: 'Outfit_600SemiBold',
     color: '#ffffff',
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 16,
   },
   evidenceRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 16,
     gap: 12,
   },
   evidenceIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,84,112,0.15)',
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 84, 112, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   evidenceTitle: {
-    fontFamily: 'Outfit_600SemiBold',
+    fontFamily: 'Inter_600SemiBold',
     color: '#ffffff',
+    fontSize: 14,
   },
   evidenceDetail: {
     fontFamily: 'Inter_400Regular',
@@ -926,170 +809,119 @@ const styles = StyleSheet.create({
   },
   evidenceBadge: {
     fontFamily: 'Inter_500Medium',
-    color: COLOR.warningStart,
-    fontSize: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+    color: '#ffffff',
+    fontSize: 10,
   },
   ctaSubtext: {
     fontFamily: 'Inter_400Regular',
     color: COLOR.textMuted,
     fontSize: 12,
-    marginTop: 10,
     textAlign: 'center',
-  },
-  planScroll: {
-    gap: 16,
-    paddingRight: 24,
-  },
-  planPressable: {
-    width: 260,
-  },
-  planCard: {
-    gap: 12,
-    minHeight: 320,
-  },
-  planCardSelected: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  planRibbon: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  planRibbonText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: COLOR.deepVoid,
-  },
-  planTitle: {
-    fontFamily: 'Outfit_700Bold',
-    color: '#ffffff',
-    fontSize: 18,
-    letterSpacing: 1,
-  },
-  planPrice: {
-    fontFamily: 'Outfit_800ExtraBold',
-    color: '#ffffff',
-    fontSize: 32,
-  },
-  planCadence: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-  },
-  planBlurb: {
-    fontFamily: 'Inter_500Medium',
-    color: '#ffffff',
-    marginTop: 4,
-  },
-  planPerks: {
     marginTop: 12,
-    gap: 8,
-  },
-  planPerkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  planPerkText: {
-    fontFamily: 'Inter_400Regular',
-    color: '#ffffff',
-    fontSize: 13,
   },
   trustBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginTop: 24,
     paddingVertical: 16,
   },
   trustItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   trustText: {
     fontFamily: 'Inter_500Medium',
-    color: '#ffffff',
-    fontSize: 12,
+    color: COLOR.textMuted,
+    fontSize: 10,
   },
   navHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+    marginBottom: 32,
+    paddingTop: 8,
   },
   logoImage: {
-    height: 32,
-    width: 120,
+    width: 40,
+    height: 40,
   },
   successRingWrapper: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   successRingOuter: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    padding: 12,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   successRingInner: {
-    flex: 1,
-    borderRadius: 88,
-    backgroundColor: 'rgba(12,14,26,0.9)',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: COLOR.deepVoid,
     alignItems: 'center',
     justifyContent: 'center',
   },
   metricRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+    marginTop: 32,
   },
   metricCard: {
     flex: 1,
+    padding: 12,
     alignItems: 'center',
-    gap: 8,
   },
   metricCardValue: {
-    fontFamily: 'Outfit_700Bold',
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 24,
     color: '#ffffff',
-    fontSize: 20,
+    marginBottom: 4,
   },
   metricCardLabel: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 10,
     color: COLOR.textMuted,
-    fontSize: 12,
+    textAlign: 'center',
   },
   liveLogCard: {
     marginTop: 24,
-    gap: 12,
   },
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    marginTop: 12,
+    gap: 12,
   },
   logIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logText: {
     fontFamily: 'Inter_400Regular',
-    color: '#ffffff',
+    color: COLOR.textMuted,
+    fontSize: 12,
     flex: 1,
-    fontSize: 13,
   },
   dashboardActions: {
-    gap: 16,
+    alignItems: 'center',
   },
   restartLink: {
-    alignSelf: 'center',
+    padding: 12,
   },
   restartText: {
     fontFamily: 'Inter_500Medium',
-    color: '#8B93B6',
+    color: COLOR.textMuted,
+    fontSize: 12,
     textDecorationLine: 'underline',
   },
 });
-

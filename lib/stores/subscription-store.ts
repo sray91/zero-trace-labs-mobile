@@ -1,193 +1,114 @@
 import { create } from 'zustand';
-import { supabase } from '../supabase';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
+import { revenueCatService } from '../revenue-cat';
 
 export type SubscriptionStatus =
+  | 'none'
   | 'active'
-  | 'cancelled'
-  | 'expired'
   | 'trialing'
   | 'past_due'
-  | null;
+  | 'cancelled'
+  | 'expired';
 
-export interface Customer {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  email: string;
-  full_name: string;
-  phone: string | null;
-  whop_user_id: string | null;
-  whop_membership_id: string | null;
-  whop_plan_id: string;
-  whop_checkout_session_id: string | null;
-  subscription_status: SubscriptionStatus;
-  plan_name: string;
-  beehiiv_subscriber_id: string | null;
-  beehiiv_subscribed_at: string | null;
-  beehiiv_status: string | null;
-  has_app_access: boolean;
-  access_expires_at: string | null;
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  referrer: string | null;
-  notes: string | null;
-  user_id: string | null;
+export interface Subscription {
+  _id: Id<"subscriptions">;
+  userId: Id<"users">;
+  clerkId: string;
+  status: SubscriptionStatus;
+  planId: string | null;
+  planName: string | null;
+  provider: string;
+  providerSubscriptionId: string | null;
+  providerCustomerId: string | null;
+  hasAppAccess: boolean;
+  currentPeriodStart: number | null;
+  currentPeriodEnd: number | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 interface SubscriptionState {
-  customer: Customer | null;
+  subscription: Subscription | null;
+  isEntitled: boolean; // RevenueCat entitlement status
   isLoading: boolean;
   error: string | null;
-  realtimeChannel: RealtimeChannel | null;
 
   // Actions
-  fetchCustomer: (userId: string) => Promise<void>;
-  createCustomer: (data: Partial<Customer>) => Promise<void>;
-  updateCustomer: (customerId: string, data: Partial<Customer>) => Promise<void>;
-  subscribeToChanges: (userId: string) => void;
-  unsubscribeFromChanges: () => void;
+  setSubscription: (subscription: Subscription | null) => void;
+  updateEntitlementStatus: () => Promise<void>;
+  restorePurchases: () => Promise<void>;
   hasActiveSubscription: () => boolean;
   reset: () => void;
 }
 
+/**
+ * Subscription store that works with Convex reactive queries.
+ * 
+ * The subscription data is fetched via Convex's useQuery hook in components,
+ * which automatically updates when data changes (no manual realtime subscription needed).
+ * 
+ * This store holds the subscription state and RevenueCat entitlement status.
+ */
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
-  customer: null,
+  subscription: null,
+  isEntitled: false,
   isLoading: false,
   error: null,
-  realtimeChannel: null,
 
-  fetchCustomer: async (userId: string) => {
-    set({ isLoading: true, error: null });
+  setSubscription: (subscription: Subscription | null) => {
+    set({ subscription });
+  },
 
+  updateEntitlementStatus: async () => {
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error) {
-        // If no customer found, that's okay - they might not have subscribed yet
-        if (error.code === 'PGRST116') {
-          set({ customer: null, isLoading: false });
-          return;
-        }
-        throw error;
-      }
-
-      set({ customer: data, isLoading: false });
+      const customerInfo = await revenueCatService.getCustomerInfo();
+      const isEntitled = customerInfo
+        ? revenueCatService.isEntitled(customerInfo)
+        : false;
+      set({ isEntitled });
     } catch (error) {
-      console.error('Error fetching customer:', error);
+      console.error('Error updating entitlement status:', error);
+    }
+  },
+
+  restorePurchases: async () => {
+    set({ isLoading: true });
+    try {
+      const customerInfo = await revenueCatService.restorePurchases();
+      const isEntitled = customerInfo
+        ? revenueCatService.isEntitled(customerInfo)
+        : false;
+
+      set({ isEntitled, isLoading: false });
+    } catch (error) {
+      console.error('Error restoring purchases:', error);
       set({
-        error: error instanceof Error ? error.message : 'Failed to fetch customer',
+        error: 'Failed to restore purchases',
         isLoading: false
       });
-    }
-  },
-
-  createCustomer: async (data: Partial<Customer>) => {
-    set({ isLoading: true, error: null });
-
-    try {
-      const { data: customer, error } = await supabase
-        .from('customers')
-        .insert([data])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      set({ customer, isLoading: false });
-    } catch (error) {
-      console.error('Error creating customer:', error);
-      set({
-        error: error instanceof Error ? error.message : 'Failed to create customer',
-        isLoading: false
-      });
-    }
-  },
-
-  updateCustomer: async (customerId: string, data: Partial<Customer>) => {
-    set({ isLoading: true, error: null });
-
-    try {
-      const { data: customer, error } = await supabase
-        .from('customers')
-        .update(data)
-        .eq('id', customerId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      set({ customer, isLoading: false });
-    } catch (error) {
-      console.error('Error updating customer:', error);
-      set({
-        error: error instanceof Error ? error.message : 'Failed to update customer',
-        isLoading: false
-      });
-    }
-  },
-
-  subscribeToChanges: (userId: string) => {
-    // Unsubscribe from any existing channel first
-    const { realtimeChannel } = get();
-    if (realtimeChannel) {
-      supabase.removeChannel(realtimeChannel);
-    }
-
-    // Subscribe to real-time changes for this user's customer record
-    const channel = supabase
-      .channel(`customer-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'customers',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          console.log('Customer record changed:', payload);
-
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            set({ customer: payload.new as Customer });
-          } else if (payload.eventType === 'DELETE') {
-            set({ customer: null });
-          }
-        }
-      )
-      .subscribe();
-
-    set({ realtimeChannel: channel });
-  },
-
-  unsubscribeFromChanges: () => {
-    const { realtimeChannel } = get();
-    if (realtimeChannel) {
-      supabase.removeChannel(realtimeChannel);
-      set({ realtimeChannel: null });
     }
   },
 
   hasActiveSubscription: () => {
-    const { customer } = get();
+    const { subscription, isEntitled } = get();
 
-    if (!customer) return false;
+    // 1. Check RevenueCat Entitlement (Primary source of truth for mobile IAP)
+    if (isEntitled) return true;
+
+    // 2. Check Convex Subscription (Webhook-synced status)
+    if (!subscription) return false;
 
     // Check if has app access
-    if (!customer.has_app_access) return false;
+    if (!subscription.hasAppAccess) return false;
 
     // Check if subscription is active or trialing
     const validStatuses: SubscriptionStatus[] = ['active', 'trialing'];
-    if (!validStatuses.includes(customer.subscription_status)) return false;
+    if (!validStatuses.includes(subscription.status)) return false;
 
     // Check if access hasn't expired
-    if (customer.access_expires_at) {
-      const expiresAt = new Date(customer.access_expires_at);
+    if (subscription.currentPeriodEnd) {
+      const expiresAt = new Date(subscription.currentPeriodEnd);
       const now = new Date();
       if (now > expiresAt) return false;
     }
@@ -196,13 +117,14 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   reset: () => {
-    const { unsubscribeFromChanges } = get();
-    unsubscribeFromChanges();
     set({
-      customer: null,
+      subscription: null,
+      isEntitled: false,
       isLoading: false,
       error: null,
-      realtimeChannel: null
     });
   },
 }));
+
+// Export the Convex query for use in components
+export { api };

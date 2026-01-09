@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { useSignUp } from '@clerk/clerk-expo';
 import { Input, Button, Card, CardContent, Logo, Alert as UIAlert } from '@/components/ui';
 
 export function SignUpScreen() {
@@ -9,12 +9,14 @@ export function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const { signUp, loading } = useAuthStore();
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState('');
+  const { signUp, setActive, isLoaded } = useSignUp();
 
   const handleSignUp = async () => {
+    if (!isLoaded) return;
+
     setError('');
-    setSuccess(false);
 
     if (!email || !password || !confirmPassword) {
       setError('Please fill in all fields');
@@ -31,41 +33,97 @@ export function SignUpScreen() {
       return;
     }
 
-    const { error: signUpError } = await signUp(email, password);
+    try {
+      await signUp.create({
+        emailAddress: email,
+        password,
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
-    } else {
-      setSuccess(true);
+      // Send email verification code
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+
+      setPendingVerification(true);
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'An error occurred during sign up');
     }
   };
 
-  if (success) {
+  const handleVerifyEmail = async () => {
+    if (!isLoaded) return;
+
+    setError('');
+
+    try {
+      const result = await signUp.attemptEmailAddressVerification({
+        code,
+      });
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        router.replace('/(tabs)');
+      } else {
+        setError('Verification failed. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'Verification failed');
+    }
+  };
+
+  if (pendingVerification) {
     return (
       <ScrollView className="flex-1 bg-white dark:bg-slate-900">
         <View className="flex-1 p-6 pt-20">
           <View className="items-center mb-12">
             <Logo size="md" />
+            <Text className="text-3xl font-bold text-gray-900 dark:text-white mt-6">
+              Verify Your Email
+            </Text>
+            <Text className="text-base text-gray-500 dark:text-gray-400 mt-2 text-center">
+              We&apos;ve sent a verification code to {email}
+            </Text>
           </View>
+
+          {error ? (
+            <View className="mb-6">
+              <UIAlert variant="danger" title="Verification Error">
+                {error}
+              </UIAlert>
+            </View>
+          ) : null}
 
           <Card variant="elevated">
             <CardContent className="p-6">
-              <UIAlert variant="success" title="Check Your Email">
-                We&apos;ve sent you a confirmation email. Please check your inbox and click the link to verify your
-                account.
-              </UIAlert>
+              <View className="gap-4">
+                <Input
+                  label="Verification Code"
+                  placeholder="Enter 6-digit code"
+                  value={code}
+                  onChangeText={setCode}
+                  keyboardType="number-pad"
+                  autoCapitalize="none"
+                />
 
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                onPress={() => router.push('/auth/login' as any)}
-                className="mt-6"
-              >
-                Back to Sign In
-              </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onPress={handleVerifyEmail}
+                  disabled={!isLoaded || !code}
+                >
+                  Verify Email
+                </Button>
+              </View>
             </CardContent>
           </Card>
+
+          <TouchableOpacity
+            onPress={() => setPendingVerification(false)}
+            className="mt-6 self-center"
+          >
+            <Text className="text-base text-gray-600 dark:text-gray-400">
+              Go back
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     );
@@ -128,9 +186,9 @@ export function SignUpScreen() {
                 size="lg"
                 fullWidth
                 onPress={handleSignUp}
-                disabled={loading}
+                disabled={!isLoaded}
               >
-                {loading ? 'Creating Account...' : 'Create Account'}
+                {!isLoaded ? 'Loading...' : 'Create Account'}
               </Button>
             </View>
           </CardContent>

@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { useSignIn } from '@clerk/clerk-expo';
 import { Input, Button, Card, CardContent, Logo, Alert as UIAlert } from '@/components/ui';
 
 export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { signIn, loading } = useAuthStore();
+  const { signIn, setActive, isLoaded } = useSignIn();
 
   const handleLogin = async () => {
+    if (!isLoaded) return;
+
     setError('');
 
     if (!email || !password) {
@@ -18,13 +20,20 @@ export function LoginScreen() {
       return;
     }
 
-    const { error: signInError } = await signIn(email, password);
+    try {
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      });
 
-    if (signInError) {
-      setError(signInError.message);
-    } else {
-      // Navigation will be handled by auth state change
-      router.replace('/(tabs)');
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        router.replace('/(tabs)');
+      } else {
+        setError('Sign in failed. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'An error occurred during sign in');
     }
   };
 
@@ -86,9 +95,9 @@ export function LoginScreen() {
                 size="lg"
                 fullWidth
                 onPress={handleLogin}
-                disabled={loading}
+                disabled={!isLoaded}
               >
-                {loading ? 'Signing In...' : 'Sign In'}
+                {!isLoaded ? 'Loading...' : 'Sign In'}
               </Button>
             </View>
           </CardContent>
