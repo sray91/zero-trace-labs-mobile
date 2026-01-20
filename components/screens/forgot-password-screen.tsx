@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useSignIn } from '@clerk/clerk-expo';
 import { Input, Button, Card, CardContent, Logo, Alert as UIAlert } from '@/components/ui';
@@ -72,8 +72,16 @@ export function ForgotPasswordScreen() {
 
   if (pendingReset) {
     return (
-      <ScrollView className="flex-1 bg-white dark:bg-slate-900">
-        <View className="flex-1 p-6 pt-20">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView
+          className="flex-1 bg-white dark:bg-slate-900"
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="flex-1 p-6 pt-20">
           <View className="items-center mb-12">
             <Logo size="md" />
             <Text className="text-3xl font-bold text-gray-900 dark:text-white mt-6">
@@ -133,15 +141,24 @@ export function ForgotPasswordScreen() {
               Go back
             </Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-white dark:bg-slate-900">
-      <View className="flex-1 p-6 pt-20">
-        {/* Logo and Header */}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1"
+    >
+      <ScrollView
+        className="flex-1 bg-white dark:bg-slate-900"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="flex-1 p-6 pt-20">
+          {/* Logo and Header */}
         <View className="items-center mb-12">
           <Logo size="md" />
           <Text className="text-3xl font-bold text-gray-900 dark:text-white mt-6">
@@ -197,15 +214,16 @@ export function ForgotPasswordScreen() {
           </CardContent>
         </Card>
 
-        {/* Back to Login Link */}
-        <View className="flex-row justify-center items-center mt-6">
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text className="text-base font-semibold text-primary-600 dark:text-primary-400">
-              Back to Sign In
-            </Text>
-          </TouchableOpacity>
+          {/* Back to Login Link */}
+          <View className="flex-row justify-center items-center mt-6">
+            <TouchableOpacity onPress={() => router.back()}>
+              <Text className="text-base font-semibold text-primary-600 dark:text-primary-400">
+                Back to Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

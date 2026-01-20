@@ -1,16 +1,19 @@
+import { Platform } from 'react-native';
 import Purchases, {
     CustomerInfo,
-    LogLevel,
+    LOG_LEVEL,
     PurchasesOffering,
     PurchasesPackage,
 } from 'react-native-purchases';
 
-// Get API Key from environment
-const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+// Platform-specific API keys
+const IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
+const ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
 
 export class RevenueCatService {
     private static instance: RevenueCatService;
     private isInitialized = false;
+    private initializationPromise: Promise<void> | null = null;
 
     private constructor() { }
 
@@ -28,24 +31,47 @@ export class RevenueCatService {
     async initialize(userId?: string) {
         if (this.isInitialized) return;
 
-        if (!API_KEY) {
-            console.warn('RevenueCat API Key not found. Subscription features will not work.');
-            return;
+        // If initialization is already in progress, wait for it
+        if (this.initializationPromise) {
+            return this.initializationPromise;
         }
 
-        try {
-            Purchases.setLogLevel(LogLevel.DEBUG); // Helpful for debugging during dev
-            Purchases.configure({ apiKey: API_KEY, appUserID: userId });
+        this.initializationPromise = (async () => {
+            try {
+                // Set log level for debugging
+                if (LOG_LEVEL?.VERBOSE !== undefined) {
+                    Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+                }
 
-            if (userId) {
-                await Purchases.logIn(userId);
+                // Configure with platform-specific API key
+                if (Platform.OS === 'ios') {
+                    if (!IOS_API_KEY) {
+                        console.warn('RevenueCat iOS API Key not found. Subscription features will not work.');
+                        return;
+                    }
+                    Purchases.configure({ apiKey: IOS_API_KEY, appUserID: userId });
+                } else if (Platform.OS === 'android') {
+                    if (!ANDROID_API_KEY) {
+                        console.warn('RevenueCat Android API Key not found. Subscription features will not work.');
+                        return;
+                    }
+                    Purchases.configure({ apiKey: ANDROID_API_KEY, appUserID: userId });
+                }
+
+                if (userId) {
+                    await Purchases.logIn(userId);
+                }
+
+                this.isInitialized = true;
+                console.log('RevenueCat initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize RevenueCat:', error);
+            } finally {
+                this.initializationPromise = null;
             }
+        })();
 
-            this.isInitialized = true;
-            console.log('RevenueCat initialized successfully');
-        } catch (error) {
-            console.error('Failed to initialize RevenueCat:', error);
-        }
+        return this.initializationPromise;
     }
 
     /**

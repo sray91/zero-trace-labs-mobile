@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useSignUp } from '@clerk/clerk-expo';
 import { Input, Button, Card, CardContent, Logo, Alert as UIAlert } from '@/components/ui';
@@ -71,8 +71,16 @@ export function SignUpScreen() {
 
   if (pendingVerification) {
     return (
-      <ScrollView className="flex-1 bg-white dark:bg-slate-900">
-        <View className="flex-1 p-6 pt-20">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView
+          className="flex-1 bg-white dark:bg-slate-900"
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="flex-1 p-6 pt-20">
           <View className="items-center mb-12">
             <Logo size="md" />
             <Text className="text-3xl font-bold text-gray-900 dark:text-white mt-6">
@@ -124,15 +132,24 @@ export function SignUpScreen() {
               Go back
             </Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-white dark:bg-slate-900">
-      <View className="flex-1 p-6 pt-20">
-        {/* Logo and Header */}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1"
+    >
+      <ScrollView
+        className="flex-1 bg-white dark:bg-slate-900"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="flex-1 p-6 pt-20">
+          {/* Logo and Header */}
         <View className="items-center mb-12">
           <Logo size="md" />
           <Text className="text-3xl font-bold text-gray-900 dark:text-white mt-6">
@@ -194,18 +211,19 @@ export function SignUpScreen() {
           </CardContent>
         </Card>
 
-        {/* Sign In Link */}
-        <View className="flex-row justify-center items-center mt-6">
-          <Text className="text-base text-gray-600 dark:text-gray-400">
-            Already have an account?{' '}
-          </Text>
-          <TouchableOpacity onPress={() => router.push('/auth/login' as any)}>
-            <Text className="text-base font-semibold text-primary-600 dark:text-primary-400">
-              Sign In
+          {/* Sign In Link */}
+          <View className="flex-row justify-center items-center mt-6">
+            <Text className="text-base text-gray-600 dark:text-gray-400">
+              Already have an account?{' '}
             </Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/auth/login' as any)}>
+              <Text className="text-base font-semibold text-primary-600 dark:text-primary-400">
+                Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

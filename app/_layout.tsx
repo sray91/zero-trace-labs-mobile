@@ -1,3 +1,4 @@
+import '@/lib/polyfills';
 import { publishableKey, tokenCache } from '@/lib/clerk';
 import { convex } from '@/lib/convex';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';

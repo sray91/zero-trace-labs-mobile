@@ -2,7 +2,7 @@
   "expo": {
     "name": "0Trace Labs",
     "slug": "0tracelabs",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "zerotracelabsmobile",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotrace.labs",
-      "buildNumber": "6",
+      "buildNumber": "9",
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",

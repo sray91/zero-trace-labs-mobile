@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useSignIn } from '@clerk/clerk-expo';
 import { Input, Button, Card, CardContent, Logo, Alert as UIAlert } from '@/components/ui';
@@ -38,8 +38,16 @@ export function LoginScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-white dark:bg-slate-900">
-      <View className="flex-1 p-6 pt-20">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1"
+    >
+      <ScrollView
+        className="flex-1 bg-white dark:bg-slate-900"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="flex-1 p-6 pt-20">
         {/* Logo and Header */}
         <View className="items-center mb-12">
           <Logo size="md" />
@@ -115,6 +123,7 @@ export function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
