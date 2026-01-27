@@ -1,7 +1,7 @@
-import '@/lib/polyfills';
-import { publishableKey, tokenCache } from '@/lib/clerk';
-import { convex } from '@/lib/convex';
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { ProtectedRoute } from '@/components/auth/protected-route';
+import { AuthProvider } from '@/components/providers/auth-provider';
+import { ClerkProvider } from '@clerk/clerk-expo';
+import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -14,25 +14,18 @@ import {
   Outfit_700Bold,
   Outfit_800ExtraBold,
 } from '@expo-google-fonts/outfit';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { ConvexProviderWithClerk } from 'convex/react-clerk';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import 'react-native-reanimated';
-import '../global.css';
 
-import { ProtectedRoute } from '@/components/auth/protected-route';
-import { AuthProvider } from '@/components/providers/auth-provider';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+if (!publishableKey) {
+  throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in environment');
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
@@ -54,22 +47,22 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <AuthProvider>
-            <ProtectedRoute>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-                <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
-                <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
-                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-              </Stack>
-            </ProtectedRoute>
-            <StatusBar style="auto" />
-          </AuthProvider>
-        </ThemeProvider>
-      </ConvexProviderWithClerk>
+      <AuthProvider>
+        <ProtectedRoute>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: '#0C0E1A' },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="auth/login" />
+            <Stack.Screen name="auth/signup" />
+            <Stack.Screen name="auth/forgot-password" />
+          </Stack>
+        </ProtectedRoute>
+      </AuthProvider>
     </ClerkProvider>
   );
 }
