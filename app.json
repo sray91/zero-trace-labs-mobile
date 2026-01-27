@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotrace.labs",
-      "buildNumber": "9",
+      "buildNumber": "33",
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",
@@ -59,7 +59,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "eas": {
