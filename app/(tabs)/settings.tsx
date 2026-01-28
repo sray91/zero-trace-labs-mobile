@@ -38,7 +38,7 @@ export default function SettingsScreen() {
   const [monitoringEnabled, setMonitoringEnabled] = useState(true);
   const [autoWipeEnabled, setAutoWipeEnabled] = useState(true);
   const [stealthAlerts, setStealthAlerts] = useState(true);
-  const { signOut, user } = useAuthStore();
+  const { signOut, user } = useClerkAuth();
 
   const handleLogout = async () => {
     await signOut();

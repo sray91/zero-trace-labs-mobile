@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "zerotracelabsmobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotrace.labs",
-      "buildNumber": "33",
+      "buildNumber": "34",
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",

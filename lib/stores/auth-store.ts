@@ -1,7 +1,6 @@
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import React from 'react';
 import { create } from 'zustand';
-import { useSubscriptionStore } from './subscription-store';
 
 interface AuthState {
   user: any | null;
@@ -35,10 +34,6 @@ export function useClerkAuth() {
   }, [isLoaded, isSignedIn, user]);
 
   const signOut = async () => {
-    // Clean up subscription store
-    useSubscriptionStore.getState().reset();
-
-    // Sign out from Clerk
     await clerkSignOut();
   };
 
