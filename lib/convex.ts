@@ -1,3 +1,6 @@
+// Must run before ConvexReactClient is constructed below — Convex's socket manager
+// calls window.addEventListener, which doesn't exist in React Native.
+import "@/lib/polyfills";
 import { useAuth } from "@clerk/clerk-expo";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";

@@ -1,5 +1,8 @@
+import '@/global.css';
 import { ProtectedRoute } from '@/components/auth/protected-route';
+import { WelcomeGate } from '@/components/auth/welcome-gate';
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { convex, ConvexProviderWithClerk, useAuth } from '@/lib/convex';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import {
@@ -41,22 +44,27 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider tokenCache={tokenCache}>
-      <AuthProvider>
-        <ProtectedRoute>
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: '#0C0E1A' },
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="auth/login" />
-            <Stack.Screen name="auth/signup" />
-            <Stack.Screen name="auth/forgot-password" />
-          </Stack>
-        </ProtectedRoute>
-      </AuthProvider>
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <AuthProvider>
+          <ProtectedRoute>
+            <WelcomeGate>
+              <StatusBar style="light" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: '#0C0E1A' },
+                }}
+              >
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="welcome" />
+                <Stack.Screen name="auth/login" />
+                <Stack.Screen name="auth/signup" />
+                <Stack.Screen name="auth/forgot-password" />
+              </Stack>
+            </WelcomeGate>
+          </ProtectedRoute>
+        </AuthProvider>
+      </ConvexProviderWithClerk>
     </ClerkProvider>
   );
 }

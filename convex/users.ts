@@ -1,84 +1,213 @@
 import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type QueryCtx,
+  type MutationCtx,
+} from "./_generated/server";
+import { Doc } from "./_generated/dataModel";
 
-/**
- * Get user by Clerk ID
- */
-export const getByClerkId = query({
-    args: { clerkId: v.string() },
-    handler: async (ctx, args) => {
-        return await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-            .first();
-    },
+// Resolve the Convex user document for the authenticated Clerk identity.
+export async function getCurrentUser(
+  ctx: QueryCtx | MutationCtx
+): Promise<Doc<"users"> | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+  return await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+    .unique();
+}
+
+// Same as getCurrentUser but throws — use inside queries/read paths that require auth.
+export async function requireCurrentUser(
+  ctx: QueryCtx | MutationCtx
+): Promise<Doc<"users">> {
+  const user = await getCurrentUser(ctx);
+  if (!user) throw new Error("Not authenticated");
+  return user;
+}
+
+// Throws unless the authenticated user is an admin. The `role` is synced from Clerk
+// publicMetadata.role by the webhook (convex/http.ts). Use to guard admin functions.
+export async function requireAdmin(
+  ctx: QueryCtx | MutationCtx
+): Promise<Doc<"users">> {
+  const user = await requireCurrentUser(ctx);
+  if (user.role !== "admin") throw new Error("Not authorized");
+  return user;
+}
+
+// For mutations: resolve the user row for the authenticated Clerk identity, creating
+// it on first write if the Clerk webhook hasn't synced it yet. This avoids a race on
+// fresh sign-ups where the user reaches /welcome before `user.created` is delivered.
+export async function getOrCreateCurrentUser(
+  ctx: MutationCtx
+): Promise<Doc<"users">> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Not authenticated");
+
+  const existing = await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+    .unique();
+  if (existing) return existing;
+
+  const userId = await ctx.db.insert("users", {
+    clerkId: identity.subject,
+    email: identity.email,
+    name: identity.name,
+    imageUrl: identity.pictureUrl,
+  });
+
+  // Link any subscription that arrived (via RevenueCat) before the user existed.
+  const orphanSub = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_rc_app_user_id", (q) =>
+      q.eq("revenueCatAppUserId", identity.subject)
+    )
+    .unique();
+  if (orphanSub && !orphanSub.userId) {
+    await ctx.db.patch(orphanSub._id, { userId });
+  }
+
+  return (await ctx.db.get(userId))!;
+}
+
+export const current = query({
+  args: {},
+  handler: async (ctx) => getCurrentUser(ctx),
 });
 
-/**
- * Create or update user from Clerk webhook
- */
+// Server-truth admin check for layout guards (client also gates instantly via Clerk
+// publicMetadata, but Convex mutations enforce this regardless).
+export const isAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    return user?.role === "admin";
+  },
+});
+
+export const getProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return null;
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    return profile;
+  },
+});
+
+export const upsertProfile = mutation({
+  args: {
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
+    addressLine1: v.optional(v.string()),
+    addressLine2: v.optional(v.string()),
+    city: v.optional(v.string()),
+    state: v.optional(v.string()),
+    zipCode: v.optional(v.string()),
+    welcomeCompleted: v.optional(v.boolean()),
+    welcomeStep: v.optional(v.number()),
+    privacyConsentGiven: v.optional(v.boolean()),
+    termsAccepted: v.optional(v.boolean()),
+    tourCompleted: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getOrCreateCurrentUser(ctx);
+    const existing = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    const now = Date.now();
+    const patch: Record<string, unknown> = { ...args };
+    if (args.privacyConsentGiven) patch.privacyConsentDate = now;
+    if (args.termsAccepted) patch.termsAcceptedDate = now;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+      return existing._id;
+    }
+    return await ctx.db.insert("userProfiles", {
+      userId: user._id,
+      welcomeCompleted: false,
+      ...patch,
+    });
+  },
+});
+
+// Called by the Clerk webhook (convex/http.ts) on user.created / user.updated.
 export const upsertFromClerk = internalMutation({
-    args: {
-        clerkId: v.string(),
-        email: v.optional(v.string()),
-        firstName: v.optional(v.string()),
-        lastName: v.optional(v.string()),
-        imageUrl: v.optional(v.string()),
-    },
-    handler: async (ctx, args) => {
-        const existingUser = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-            .first();
+  args: {
+    clerkId: v.string(),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    role: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
 
-        const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        email: args.email,
+        name: args.name,
+        imageUrl: args.imageUrl,
+        role: args.role,
+      });
+      return existing._id;
+    }
 
-        if (existingUser) {
-            await ctx.db.patch(existingUser._id, {
-                email: args.email,
-                firstName: args.firstName,
-                lastName: args.lastName,
-                imageUrl: args.imageUrl,
-                updatedAt: now,
-            });
-            return existingUser._id;
-        } else {
-            return await ctx.db.insert("users", {
-                clerkId: args.clerkId,
-                email: args.email,
-                firstName: args.firstName,
-                lastName: args.lastName,
-                imageUrl: args.imageUrl,
-                createdAt: now,
-                updatedAt: now,
-            });
-        }
-    },
+    const userId = await ctx.db.insert("users", {
+      clerkId: args.clerkId,
+      email: args.email,
+      name: args.name,
+      imageUrl: args.imageUrl,
+      role: args.role,
+    });
+
+    // Link any subscription that arrived (via RevenueCat) before the user existed.
+    const orphanSub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_rc_app_user_id", (q) =>
+        q.eq("revenueCatAppUserId", args.clerkId)
+      )
+      .unique();
+    if (orphanSub && !orphanSub.userId) {
+      await ctx.db.patch(orphanSub._id, { userId });
+    }
+
+    return userId;
+  },
 });
 
-/**
- * Delete user (for Clerk webhook when user is deleted)
- */
-export const deleteByClerkId = internalMutation({
-    args: { clerkId: v.string() },
-    handler: async (ctx, args) => {
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-            .first();
+// Called by the Clerk webhook on user.deleted.
+export const deleteFromClerk = internalMutation({
+  args: { clerkId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+    if (!user) return;
 
-        if (user) {
-            // Also delete their subscription
-            const subscription = await ctx.db
-                .query("subscriptions")
-                .withIndex("by_user_id", (q) => q.eq("userId", user._id))
-                .first();
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    if (profile) await ctx.db.delete(profile._id);
 
-            if (subscription) {
-                await ctx.db.delete(subscription._id);
-            }
-
-            await ctx.db.delete(user._id);
-        }
-    },
+    await ctx.db.delete(user._id);
+  },
 });
