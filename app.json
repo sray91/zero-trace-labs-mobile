@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "0Trace Labs",
-    "slug": "0tracelabs",
+    "slug": "zero-trace-labs",
     "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotracelabs.app",
-      "buildNumber": "36",
+      "buildNumber": "37",
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",
@@ -63,7 +63,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "4fb74c1a-28cc-485d-98aa-730ffd3317d0"
+        "projectId": "c9eda949-30e8-4355-bb3f-4f3247fc9f0c"
       },
       "router": {}
     },
@@ -72,7 +72,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/4fb74c1a-28cc-485d-98aa-730ffd3317d0"
+      "url": "https://u.expo.dev/c9eda949-30e8-4355-bb3f-4f3247fc9f0c"
     }
   }
 }
