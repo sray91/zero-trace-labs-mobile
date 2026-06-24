@@ -14,8 +14,8 @@
       "backgroundColor": "#0C0E1A"
     },
     "ios": {
-      "bundleIdentifier": "com.zerotrace.labs",
-      "buildNumber": "35",
+      "bundleIdentifier": "com.zerotracelabs.app",
+      "buildNumber": "36",
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",
