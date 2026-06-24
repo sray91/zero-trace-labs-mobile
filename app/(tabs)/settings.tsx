@@ -1,44 +1,33 @@
+import { api } from '@/convex/_generated/api';
 import { useClerkAuth } from '@/lib/stores/auth-store';
+import { COLOR } from '@/lib/theme/colors';
+import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React from 'react';
 import {
-    Image,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    View,
+  Image,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
-const COLOR = {
-  deepVoid: '#0C0E1A',
-  nuclearStart: '#00D4FF',
-  nuclearEnd: '#006CFF',
-  warningEnd: '#FF9F1C',
-  successStart: '#3DD598',
-  glassBorder: 'rgba(0, 212, 255, 0.35)',
-  glassBg: 'rgba(255, 255, 255, 0.04)',
-  textMuted: '#8B93B6',
-};
-
-interface GlassCardProps {
-  children: React.ReactNode;
-  style?: any;
-}
-
-const GlassCard = ({ children, style }: GlassCardProps) => (
-  <View style={[styles.glassCard, styles.glassCardBody, style]}>{children}</View>
+const GlassCard = ({ children, style }: { children: React.ReactNode; style?: object }) => (
+  <View style={[styles.glassCard, style]}>{children}</View>
 );
 
 export default function SettingsScreen() {
-  const [monitoringEnabled, setMonitoringEnabled] = useState(true);
-  const [autoWipeEnabled, setAutoWipeEnabled] = useState(true);
-  const [stealthAlerts, setStealthAlerts] = useState(true);
   const { signOut, user } = useClerkAuth();
+  const profile = useQuery(api.users.getProfile);
+
+  const email = user?.primaryEmailAddress?.emailAddress;
+  const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ');
+  const avatarChar = (fullName || email || 'U').charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     await signOut();
@@ -54,10 +43,7 @@ export default function SettingsScreen() {
           style={styles.backgroundGradient}
         />
       </View>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Image
             source={require('@/assets/images/0tracelabs-logo-dark.png')}
@@ -66,16 +52,15 @@ export default function SettingsScreen() {
           />
         </View>
 
+        {/* Account */}
         <GlassCard style={styles.profileCard}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <Text style={styles.avatarText}>
-                {user?.primaryEmailAddress?.emailAddress?.charAt(0).toUpperCase() || 'U'}
-              </Text>
+              <Text style={styles.avatarText}>{avatarChar}</Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileEmail}>{user?.primaryEmailAddress?.emailAddress || 'No email'}</Text>
-              <Text style={styles.profileId}>ID: {user?.id?.slice(0, 8) || 'N/A'}</Text>
+              <Text style={styles.profileName}>{fullName || 'Your Account'}</Text>
+              <Text style={styles.profileEmail}>{email || 'No email'}</Text>
             </View>
           </View>
           <View style={styles.profileStats}>
@@ -87,7 +72,10 @@ export default function SettingsScreen() {
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
                 {user?.createdAt
-                  ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                  ? new Date(user.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })
                   : 'N/A'}
               </Text>
               <Text style={styles.statLabel}>Member Since</Text>
@@ -95,58 +83,17 @@ export default function SettingsScreen() {
           </View>
         </GlassCard>
 
-        <Text style={styles.sectionLabel}>Secure Settings</Text>
-        <Text style={styles.subhead}>Tune detonation policy, notifications, and monitoring cadence.</Text>
-
-        <GlassCard style={styles.settingsCard}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingCopy}>
-              <Text style={styles.settingTitle}>Live Monitoring</Text>
-              <Text style={styles.settingDetail}>24/7 data broker sweeps.</Text>
+        {/* Removal service info — read-only model */}
+        <GlassCard style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Ionicons name="shield-checkmark" size={22} color={COLOR.nuclearStart} />
+            <View style={styles.infoCopy}>
+              <Text style={styles.infoTitle}>Managed Removals</Text>
+              <Text style={styles.infoBody}>
+                Our team submits and tracks your data broker removals. Follow your progress on
+                the Dashboard.
+              </Text>
             </View>
-            <Switch
-              value={monitoringEnabled}
-              onValueChange={setMonitoringEnabled}
-              trackColor={{ false: 'rgba(255,255,255,0.2)', true: COLOR.nuclearEnd }}
-              thumbColor={monitoringEnabled ? '#ffffff' : '#6B7280'}
-              ios_backgroundColor="rgba(255,255,255,0.2)"
-            />
-          </View>
-          <View style={styles.settingRow}>
-            <View style={styles.settingCopy}>
-              <Text style={styles.settingTitle}>Auto Wipe</Text>
-              <Text style={styles.settingDetail}>Instant detonation when new traces appear.</Text>
-            </View>
-            <Switch
-              value={autoWipeEnabled}
-              onValueChange={setAutoWipeEnabled}
-              trackColor={{ false: 'rgba(255,255,255,0.2)', true: COLOR.warningEnd }}
-              thumbColor={autoWipeEnabled ? '#ffffff' : '#6B7280'}
-              ios_backgroundColor="rgba(255,255,255,0.2)"
-            />
-          </View>
-          <View style={styles.settingRow}>
-            <View style={styles.settingCopy}>
-              <Text style={styles.settingTitle}>Stealth Alerts</Text>
-              <Text style={styles.settingDetail}>Only notify on critical broker events.</Text>
-            </View>
-            <Switch
-              value={stealthAlerts}
-              onValueChange={setStealthAlerts}
-              trackColor={{ false: 'rgba(255,255,255,0.2)', true: COLOR.successStart }}
-              thumbColor={stealthAlerts ? '#ffffff' : '#6B7280'}
-              ios_backgroundColor="rgba(255,255,255,0.2)"
-            />
-          </View>
-        </GlassCard>
-
-        <GlassCard style={styles.logsCard}>
-          <Text style={styles.cardTitle}>Detonation Logs</Text>
-          <View style={styles.logRow}>
-            <Text style={styles.logText}>342 Records nuked • Last detonation: 12m ago</Text>
-          </View>
-          <View style={styles.logRow}>
-            <Text style={styles.logText}>Monitoring cadence: 15 min</Text>
           </View>
         </GlassCard>
 
@@ -155,7 +102,7 @@ export default function SettingsScreen() {
         </Pressable>
 
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>ZeroTrace Labs v1.0.0</Text>
+          <Text style={styles.appInfoText}>ZeroTrace Labs v1.7.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -163,44 +110,21 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLOR.deepVoid,
+  safeArea: { flex: 1, backgroundColor: COLOR.deepVoid },
+  backgroundGlow: { position: 'absolute', top: -120, left: -60, right: -60, height: 360 },
+  backgroundGradient: { flex: 1, borderRadius: 999, opacity: 0.6 },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 100 },
+  header: { marginBottom: 20 },
+  logoImage: { height: 32, width: 120 },
+  glassCard: {
+    backgroundColor: COLOR.glassBg,
+    borderColor: COLOR.glassBorder,
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 20,
   },
-  backgroundGlow: {
-    position: 'absolute',
-    top: -120,
-    left: -60,
-    right: -60,
-    height: 360,
-  },
-  backgroundGradient: {
-    flex: 1,
-    borderRadius: 999,
-    opacity: 0.6,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    paddingBottom: 100,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  logoImage: {
-    height: 32,
-    width: 120,
-  },
-  profileCard: {
-    marginBottom: 32,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 20,
-  },
+  profileCard: { marginBottom: 16 },
+  profileHeader: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20 },
   avatarContainer: {
     width: 56,
     height: 56,
@@ -209,45 +133,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 24,
-    color: COLOR.deepVoid,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileEmail: {
+  avatarText: { fontFamily: 'Outfit_600SemiBold', fontSize: 24, color: COLOR.deepVoid },
+  profileInfo: { flex: 1 },
+  profileName: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 16,
-    color: '#ffffff',
+    color: COLOR.white,
     marginBottom: 4,
   },
-  profileId: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: COLOR.textMuted,
-  },
+  profileEmail: { fontFamily: 'Inter_400Regular', fontSize: 13, color: COLOR.textMuted },
   profileStats: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: COLOR.hairline,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, height: 32, backgroundColor: COLOR.hairline },
   statValue: {
     fontFamily: 'Outfit_600SemiBold',
     fontSize: 14,
-    color: '#ffffff',
+    color: COLOR.white,
     marginBottom: 4,
   },
   statLabel: {
@@ -256,92 +163,25 @@ const styles = StyleSheet.create({
     color: COLOR.textMuted,
     textAlign: 'center',
   },
-  sectionLabel: {
+  infoCard: { marginBottom: 24 },
+  infoRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  infoCopy: { flex: 1 },
+  infoTitle: {
     fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  subhead: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  glassCard: {
-    backgroundColor: COLOR.glassBg,
-    borderColor: COLOR.glassBorder,
-    borderWidth: 1,
-    borderRadius: 24,
-  },
-  glassCardBody: {
-    padding: 20,
-  },
-  settingsCard: {
-    gap: 20,
-    marginBottom: 24,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  settingCopy: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    fontSize: 16,
-  },
-  settingDetail: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  logsCard: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  cardTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
+    color: COLOR.white,
     marginBottom: 4,
   },
-  logRow: {
-    paddingVertical: 4,
-  },
-  logText: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 13,
-  },
+  infoBody: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19, color: COLOR.textMuted },
   dangerButton: {
-    marginTop: 16,
+    marginTop: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#FF5470',
+    borderColor: COLOR.danger,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  dangerButtonText: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#FF5470',
-    letterSpacing: 1,
-  },
-  appInfo: {
-    marginTop: 32,
-    alignItems: 'center',
-  },
-  appInfoText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: COLOR.textMuted,
-  },
+  dangerButtonText: { fontFamily: 'Outfit_600SemiBold', color: COLOR.danger, letterSpacing: 1 },
+  appInfo: { marginTop: 32, alignItems: 'center' },
+  appInfoText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted },
 });

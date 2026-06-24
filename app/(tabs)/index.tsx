@@ -1,496 +1,97 @@
-import { RevenueCatPaywall } from '@/components/paywall/paywall';
-import { revenueCatService } from '@/lib/revenue-cat';
-import { useAuthStore } from '@/lib/stores/auth-store';
-import { useOnboardingStore } from '@/lib/stores/onboarding-store';
-import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { api } from '@/convex/_generated/api';
+import { ACCENT, AccentRole, COLOR, STATUS_LABEL, statusColor, TIER_LABEL } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
-  Animated,
-  Image,
-  Pressable,
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
-  StyleProp,
   StyleSheet,
   Text,
   View,
-  ViewStyle
 } from 'react-native';
 
-type ExperienceStage = 'welcome' | 'scan' | 'results' | 'paywall' | 'dashboard';
-type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-
-interface ScanEvent {
-  name: string;
-  detail: string;
-  severity: Severity;
-}
-
-const COLOR = {
-  deepVoid: '#0C0E1A',
-  nuclearStart: '#00D4FF',
-  nuclearEnd: '#006CFF',
-  warningStart: '#FFE066',
-  warningEnd: '#FF9F1C',
-  successStart: '#3DD598',
-  successEnd: '#1EB980',
-  glassBorder: 'rgba(0, 212, 255, 0.35)',
-  glassBg: 'rgba(255, 255, 255, 0.04)',
-  textMuted: '#8B93B6',
-};
-
-const STAGE_FLOW: ExperienceStage[] = ['welcome', 'scan', 'results', 'paywall', 'dashboard'];
-const STAGE_LABELS: Record<ExperienceStage, string> = {
-  welcome: 'Welcome',
-  scan: 'Live Scan',
-  results: 'Critical Findings',
-  paywall: 'Authorize Detonation',
-  dashboard: 'Clean Slate',
-};
-
-const SCAN_MESSAGES = [
-  'Checking Acxiom...',
-  'Pinging LexisNexis...',
-  'Interpolating breach archives...',
-  'Found email address...',
-  'Found home IP...',
-  'Mapping relatives graph...',
-  'Decrypting broker payloads...',
-];
-
-const SCAN_EVENTS: ScanEvent[] = [
-  { name: 'Acxiom', detail: 'Home Address, DOB', severity: 'critical' },
-  { name: 'PeopleFinder', detail: 'Phone, Relatives', severity: 'high' },
-  { name: 'Whitepages', detail: 'Full Name, IP', severity: 'medium' },
-  { name: 'Spokeo', detail: 'Photos, Social Handles', severity: 'high' },
-  { name: 'LexisNexis', detail: 'Financial Traces', severity: 'critical' },
-  { name: 'Dark Node 7', detail: 'Credential Dump', severity: 'critical' },
-  { name: 'RocketReach', detail: 'Work Email, Role', severity: 'medium' },
-];
-
-const BROKER_FINDINGS = [
-  { name: 'Acxiom', detail: 'Contains: Home Address, DOB', type: 'Broker' },
-  { name: 'PeopleFinder', detail: 'Contains: Phone, Relatives', type: 'Broker' },
-  { name: 'Dark Web Exchange', detail: 'Contains: Credentials, IP', type: 'Dark Web' },
-  { name: 'LexisNexis', detail: 'Contains: Financial Records', type: 'Broker' },
-];
-
-const DASHBOARD_METRICS = [
-  { label: 'Records Nuked', value: '342' },
-  { label: 'Brokers Blocked', value: '512' },
-  { label: 'Active Monitor', value: '24/7' },
-];
-
-const LIVE_ACTIVITY = [
-  { icon: 'sparkles', text: 'Removed from Whitepages (2m ago)', color: COLOR.successStart },
-  { icon: 'scan-circle', text: 'Hourly scan complete. No new threats.', color: COLOR.nuclearStart },
-  { icon: 'shield-checkmark', text: 'Firewall signature updated.', color: '#8B5CF6' },
-];
-
-
-const severityColors: Record<Severity, string> = {
-  critical: '#FF5470',
-  high: '#FFB347',
-  medium: '#FFD670',
-  low: '#3DD598',
-  info: '#48C6EF',
-};
-
-const severityTitles: Record<Severity, string> = {
-  critical: 'CRITICAL',
-  high: 'HIGH',
-  medium: 'MEDIUM',
-  low: 'LOW',
-  info: 'INFO',
-};
-
-interface GlassCardProps {
-  children: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-  noPadding?: boolean;
-}
-
-const GlassCard = ({ children, style, noPadding }: GlassCardProps) => (
-  <View style={[styles.glassCard, !noPadding && styles.glassCardBody, style]}>{children}</View>
-);
-
-interface GradientButtonProps {
-  label: string;
-  colors: string[];
-  textColor?: string;
-  onPress: () => void;
-  pulse?: boolean;
-}
-
-const GradientButton = ({ label, colors, textColor = COLOR.deepVoid, onPress, pulse }: GradientButtonProps) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!pulse) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse, pulseAnim]);
-
-  return (
-    <Pressable onPress={onPress} style={styles.gradientPressable}>
-      <Animated.View style={[styles.gradientAnimated, pulse && { transform: [{ scale: pulseAnim }] }]}>
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientButton}>
-          <Text style={[styles.buttonLabel, { color: textColor }]}>{label}</Text>
-        </LinearGradient>
-      </Animated.View>
-    </Pressable>
-  );
-};
-
-const StageIndicator = ({ currentStage }: { currentStage: ExperienceStage }) => (
-  <View style={styles.stageIndicator}>
-    <View style={styles.stageDots}>
-      {STAGE_FLOW.map((item) => {
-        const active = item === currentStage;
-        return <View key={item} style={[styles.stageDot, active && styles.stageDotActive]} />;
-      })}
-    </View>
-    <Text style={styles.stageIndicatorText}>{STAGE_LABELS[currentStage]}</Text>
-  </View>
-);
-
-const WelcomeStage = ({ onStart }: { onStart: () => void }) => {
-  const pulse = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.12, duration: 1400, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-
-  return (
-    <View style={[styles.stageBase, styles.stageSpacing]}>
-      <View>
-        <Text style={styles.statusChip}>SYSTEM ONLINE</Text>
-        <View style={styles.heroWrapper}>
-          <Animated.View style={{ transform: [{ scale: pulse }] }}>
-            <LinearGradient colors={[COLOR.nuclearStart, COLOR.nuclearEnd]} style={styles.heroOrb}>
-              <View style={styles.heroCore} />
-            </LinearGradient>
-            <View style={styles.heroScanLines} />
-          </Animated.View>
-        </View>
-        <Text style={styles.headline}>THE NUCLEAR OPTION FOR SPAM.</Text>
-        <Text style={styles.subhead}>
-          They can&apos;t sell what we annihilate. Zero trace left behind.
-        </Text>
-      </View>
-      <View>
-        <GradientButton
-          label="INITIATE FREE SCAN"
-          colors={[COLOR.nuclearStart, COLOR.nuclearEnd]}
-          textColor="#02101F"
-          onPress={onStart}
-        />
-        <Text style={styles.caption}>0Trace Detonation Suite • Free scan hooks the mark.</Text>
-      </View>
-    </View>
-  );
-};
-
-const ScanStage = ({
-  progress,
-  message,
-  stream,
-}: {
-  progress: number;
-  message: string;
-  stream: ScanEvent[];
-}) => {
-  const rotation = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 4500,
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      rotation.setValue(0);
-    };
-  }, [rotation]);
-
-  const spin = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+function formatDate(ms: number): string {
+  return new Date(ms).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
   });
+}
 
+const GlassCard = ({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: object;
+}) => <View style={[styles.glassCard, style]}>{children}</View>;
+
+const StatCard = ({
+  label,
+  value,
+  sub,
+  accent,
+  icon,
+}: {
+  label: string;
+  value: number;
+  sub: string;
+  accent: AccentRole;
+  icon: keyof typeof Ionicons.glyphMap;
+}) => {
+  const color = ACCENT[accent];
   return (
-    <View style={[styles.stageBase, styles.stageSpacing]}>
-      <View>
-        <Text style={styles.sectionLabel}>Scanning Environment...</Text>
-        <View style={styles.progressRingContainer}>
-          <Animated.View style={[styles.progressOuter, { transform: [{ rotate: spin }] }]}>
-            <LinearGradient colors={[COLOR.nuclearStart, COLOR.nuclearEnd]} style={styles.progressGradient}>
-              <View style={styles.progressHollow} />
-            </LinearGradient>
-          </Animated.View>
-          <View style={styles.progressInner}>
-            <Text style={styles.progressValue}>{Math.min(100, Math.round(progress))}%</Text>
-            <Text style={styles.progressMessage}>{message}</Text>
-          </View>
-        </View>
-        <View style={styles.streamContainer}>
-          {stream.map((entry, idx) => (
-            <GlassCard key={`${entry.name}-${idx}`} style={styles.streamRow}>
-              <View style={[styles.streamIcon, { backgroundColor: `${severityColors[entry.severity]}22` }]}>
-                <Ionicons name="alert-circle" size={18} color={severityColors[entry.severity]} />
-              </View>
-              <View style={styles.streamCopy}>
-                <Text style={styles.streamTitle}>{entry.name}</Text>
-                <Text style={styles.streamDetail}>{entry.detail}</Text>
-              </View>
-              <Text style={[styles.streamSeverity, { color: severityColors[entry.severity] }]}>
-                {severityTitles[entry.severity]}
-              </Text>
-            </GlassCard>
-          ))}
-        </View>
-      </View>
-      <Text style={styles.footerCaption}>Searching 500+ dark web and broker databases.</Text>
+    <View style={styles.statCard}>
+      <Ionicons name={icon} size={20} color={color} style={{ marginBottom: 8 }} />
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statSub}>{sub}</Text>
     </View>
   );
 };
 
-const ResultsStage = ({ onDetonate }: { onDetonate: () => void }) => (
-  <View style={[styles.stageBase, styles.stageSpacing]}>
-    <View>
-      <Text style={styles.sectionLabel}>SCAN COMPLETE</Text>
-      <Text style={styles.metricValue}>342</Text>
-      <Text style={styles.metricLabel}>ACTIVE TRACES FOUND</Text>
-      <Text style={styles.subhead}>Your personal data is currently for sale on the open market.</Text>
-      <GlassCard style={styles.evidenceCard}>
-        <Text style={styles.cardTitle}>Evidence Payload</Text>
-        {BROKER_FINDINGS.map((finding) => (
-          <View key={finding.name} style={styles.evidenceRow}>
-            <View style={styles.evidenceIcon}>
-              <Ionicons name="server" size={18} color="#FF5470" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.evidenceTitle}>{finding.name}</Text>
-              <Text style={styles.evidenceDetail}>{finding.detail}</Text>
-            </View>
-            <Text style={styles.evidenceBadge}>{finding.type}</Text>
-          </View>
-        ))}
-      </GlassCard>
-    </View>
-    <View>
-      <GradientButton
-        label="DETONATE ALL 342 RECORDS"
-        colors={[COLOR.warningStart, COLOR.warningEnd]}
-        textColor={COLOR.deepVoid}
-        onPress={onDetonate}
-        pulse
-      />
-      <Text style={styles.ctaSubtext}>30-day money-back guarantee. Total erasure.</Text>
-    </View>
-  </View>
-);
-
-const PaywallStage = ({
-  onActivate,
+const ProgressBar = ({
+  label,
+  pct,
+  color,
 }: {
-  onActivate: () => void;
+  label: string;
+  pct: number;
+  color: string;
 }) => (
-  <View style={[styles.stageBase, styles.stageSpacing]}>
-    <View>
-      <Text style={styles.sectionLabel}>AUTHORIZE DETONATION</Text>
-      <Text style={styles.subhead}>To wipe these records and monitor for reappearance, activate 0Trace Prime.</Text>
-      <View style={{ padding: 20, alignItems: 'center' }}>
-        <GlassCard style={{ width: '100%', alignItems: 'center', padding: 24 }}>
-          <Ionicons name="shield-checkmark" size={48} color={COLOR.nuclearStart} style={{ marginBottom: 16 }} />
-          <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>
-            Secure Your Privacy
-          </Text>
-          <Text style={{ color: COLOR.textMuted, textAlign: 'center' }}>
-            Choose a plan that fits your needs to remove your data from data brokers.
-          </Text>
-        </GlassCard>
-      </View>
+  <View style={styles.progressBlock}>
+    <View style={styles.progressLabelRow}>
+      <Text style={styles.progressLabel}>{label}</Text>
+      <Text style={[styles.progressPct, { color }]}>{pct}%</Text>
     </View>
-    <GradientButton
-      label="VIEW PLANS"
-      colors={[COLOR.nuclearStart, COLOR.nuclearEnd]}
-      textColor="#02101F"
-      onPress={onActivate}
-    />
-  </View>
-);
-
-const DashboardStage = ({ onRestart }: { onRestart: () => void }) => (
-  <View style={[styles.stageBase, styles.stageSpacing]}>
-    <View>
-      <View style={styles.navHeader}>
-        <Image
-          source={require('@/assets/images/0tracelabs-logo-dark.png')}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-      </View>
-      <View style={styles.successRingWrapper}>
-        <LinearGradient colors={[COLOR.successStart, COLOR.successEnd]} style={styles.successRingOuter}>
-          <View style={styles.successRingInner}>
-            <Ionicons name="checkmark-circle" size={48} color="#3DD598" />
-          </View>
-        </LinearGradient>
-      </View>
-      <Text style={styles.headline}>ZERO TRACE</Text>
-      <Text style={[styles.subhead, { color: COLOR.successStart }]}>SYSTEM SECURE.</Text>
-      <View style={styles.metricRow}>
-        {DASHBOARD_METRICS.map((metric) => (
-          <GlassCard key={metric.label} style={styles.metricCard}>
-            <Text style={styles.metricCardValue}>{metric.value}</Text>
-            <Text style={styles.metricCardLabel}>{metric.label}</Text>
-          </GlassCard>
-        ))}
-      </View>
-      <GlassCard style={styles.liveLogCard}>
-        <Text style={styles.cardTitle}>Live Log</Text>
-        {LIVE_ACTIVITY.map((item) => (
-          <View key={item.text} style={styles.logRow}>
-            <View style={[styles.logIcon, { backgroundColor: `${item.color}22` }]}>
-              <Ionicons name={item.icon as any} size={16} color={item.color} />
-            </View>
-            <Text style={styles.logText}>{item.text}</Text>
-          </View>
-        ))}
-      </GlassCard>
-    </View>
-    <View style={styles.dashboardActions}>
-      <Pressable onPress={onRestart} style={styles.restartLink}>
-        <Text style={styles.restartText}>Restart Detonation Flow</Text>
-      </Pressable>
+    <View style={styles.progressTrack}>
+      <View
+        style={[styles.progressFill, { width: `${Math.min(100, pct)}%`, backgroundColor: color }]}
+      />
     </View>
   </View>
 );
 
-export default function HomeScreen() {
-  const { user } = useAuthStore();
-  const { welcomeCompleted, completeWelcome, initialize: initializeOnboarding } = useOnboardingStore();
-  const { hasActiveSubscription } = useSubscriptionStore();
-  const [stage, setStage] = useState<ExperienceStage>('welcome');
-  const [scanProgress, setScanProgress] = useState(12);
-  const [scanMessage, setScanMessage] = useState(SCAN_MESSAGES[0]);
-  const [scanStream, setScanStream] = useState<ScanEvent[]>([]);
-  const [showRevenueCatPaywall, setShowRevenueCatPaywall] = useState(false);
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+  <Text style={styles.sectionTitle}>{children}</Text>
+);
 
-  // Initialize RevenueCat
-  useEffect(() => {
-    if (user?.id) {
-      revenueCatService.initialize(user.id);
-    } else {
-      revenueCatService.initialize();
-    }
-  }, [user?.id]);
+export default function DashboardScreen() {
+  const data = useQuery(api.dashboard.forCurrentUser);
 
-  // Initialize onboarding state and set initial stage
-  useEffect(() => {
-    initializeOnboarding();
-  }, [initializeOnboarding]);
+  if (data === undefined) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={COLOR.nuclearStart} />
+      </View>
+    );
+  }
 
-  // Skip to dashboard if welcome already completed AND has active subscription
-  useEffect(() => {
-    if (welcomeCompleted && hasActiveSubscription() && stage === 'welcome') {
-      setStage('dashboard');
-    }
-  }, [welcomeCompleted, hasActiveSubscription, stage]);
-
-  useEffect(() => {
-    let progressTimer: ReturnType<typeof setInterval> | undefined;
-    let messageTimer: ReturnType<typeof setInterval> | undefined;
-    let streamTimer: ReturnType<typeof setInterval> | undefined;
-    let autoAdvance: ReturnType<typeof setTimeout> | undefined;
-
-    if (stage === 'scan') {
-      setScanProgress(12);
-      setScanStream([]);
-      setScanMessage(SCAN_MESSAGES[0]);
-      let messageIndex = 0;
-      let streamIndex = 0;
-
-      messageTimer = setInterval(() => {
-        messageIndex = (messageIndex + 1) % SCAN_MESSAGES.length;
-        setScanMessage(SCAN_MESSAGES[messageIndex]);
-      }, 900);
-
-      progressTimer = setInterval(() => {
-        setScanProgress((prev) => Math.min(100, prev + 8 + Math.random() * 10));
-      }, 500);
-
-      streamTimer = setInterval(() => {
-        setScanStream((prev) => {
-          const next = SCAN_EVENTS[streamIndex % SCAN_EVENTS.length];
-          streamIndex += 1;
-          const updated = [...prev, next];
-          return updated.slice(-6);
-        });
-      }, 600);
-
-      autoAdvance = setTimeout(() => setStage('results'), 6500);
-    }
-
-    return () => {
-      if (progressTimer) clearInterval(progressTimer);
-      if (messageTimer) clearInterval(messageTimer);
-      if (streamTimer) clearInterval(streamTimer);
-      if (autoAdvance) clearTimeout(autoAdvance);
-    };
-  }, [stage]);
-
-  const renderStage = () => {
-    // Show RevenueCat paywall if triggered
-    if (showRevenueCatPaywall) {
-      return (
-        <RevenueCatPaywall
-          onDismiss={() => setShowRevenueCatPaywall(false)}
-          onSuccess={() => {
-            setShowRevenueCatPaywall(false);
-            completeWelcome();
-            setStage('dashboard');
-          }}
-        />
-      );
-    }
-
-    switch (stage) {
-      case 'welcome':
-        return <WelcomeStage onStart={() => setStage('scan')} />;
-      case 'scan':
-        return <ScanStage progress={scanProgress} message={scanMessage} stream={scanStream} />;
-      case 'results':
-        return <ResultsStage onDetonate={() => setStage('paywall')} />;
-      case 'paywall':
-        return <PaywallStage onActivate={() => setShowRevenueCatPaywall(true)} />;
-      case 'dashboard':
-        return <DashboardStage onRestart={() => setStage('welcome')} />;
-      default:
-        return null;
-    }
-  };
+  const { total, tierCounts, summary, completion, byTier, byCategory, tier1, lastUpdated } = data;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -501,427 +102,330 @@ export default function HomeScreen() {
           style={styles.backgroundGradient}
         />
       </View>
-      <View style={styles.content}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            welcomeCompleted && { paddingBottom: 80 }
-          ]}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          {renderStage()}
-        </ScrollView>
-        <StageIndicator currentStage={stage} />
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. Header */}
+        <Text style={styles.title}>Data Removal Progress</Text>
+        <Text style={styles.subtitle}>
+          Tracking {total} data brokers
+          {lastUpdated ? ` · Last updated ${formatDate(lastUpdated)}` : ' · No activity yet'}
+        </Text>
+
+        {/* 2. Summary stat cards */}
+        <View style={styles.statGrid}>
+          <StatCard
+            label="Total Brokers"
+            value={total}
+            sub="In your tracker"
+            accent="nuclear-blue"
+            icon="shield-checkmark"
+          />
+          <StatCard
+            label="Not Started"
+            value={summary.notStarted}
+            sub="Pending action"
+            accent="muted-gray"
+            icon="ellipse-outline"
+          />
+          <StatCard
+            label="Opt-Outs Submitted"
+            value={summary.submitted}
+            sub="Awaiting confirmation"
+            accent="warning-yellow"
+            icon="time-outline"
+          />
+          <StatCard
+            label="Confirmed Removed"
+            value={summary.removed}
+            sub="Verified clean"
+            accent="success-green"
+            icon="checkmark-circle"
+          />
+        </View>
+
+        {/* 3. Overall completion */}
+        <GlassCard>
+          <SectionTitle>Overall Completion Rate</SectionTitle>
+          <ProgressBar
+            label="Confirmed removed"
+            pct={completion.removedPct}
+            color={COLOR.successStart}
+          />
+          <ProgressBar
+            label="Opt-outs submitted"
+            pct={completion.submittedPct}
+            color={COLOR.warningEnd}
+          />
+          <ProgressBar
+            label="Not yet started"
+            pct={completion.notStartedPct}
+            color={COLOR.textMuted}
+          />
+        </GlassCard>
+
+        {/* 4. Tier counts */}
+        <View style={styles.tierRow}>
+          {[1, 2, 3].map((tier) => (
+            <View key={tier} style={styles.tierCard}>
+              <Text style={styles.tierValue}>{tierCounts[tier as 1 | 2 | 3] ?? 0}</Text>
+              <Text style={styles.tierLabel}>{TIER_LABEL[tier]}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* 5. Status breakdown by tier */}
+        <GlassCard>
+          <SectionTitle>Status Breakdown by Tier</SectionTitle>
+          {byTier.map((row) => (
+            <View key={row.tier} style={styles.breakdownBlock}>
+              <View style={styles.breakdownHeader}>
+                <Text style={styles.breakdownTier}>{TIER_LABEL[row.tier]}</Text>
+                <Text style={styles.breakdownTotal}>{row.total} total</Text>
+              </View>
+              <View style={styles.statPills}>
+                <StatPill label="Not Started" value={row.notStarted} />
+                <StatPill label="Searched – Found" value={row.searchedFound} />
+                <StatPill label="Submitted" value={row.submitted} color={COLOR.warningEnd} />
+                <StatPill label="Removed" value={row.removed} color={COLOR.successStart} />
+                <StatPill label="Handled" value={row.handledByService} color={COLOR.successStart} />
+              </View>
+            </View>
+          ))}
+        </GlassCard>
+
+        {/* 6. Brokers by category */}
+        <GlassCard>
+          <SectionTitle>Brokers by Category</SectionTitle>
+          {byCategory.length === 0 ? (
+            <Text style={styles.emptyText}>No categories yet.</Text>
+          ) : (
+            byCategory.map((row) => (
+              <View key={row.category} style={styles.categoryRow}>
+                <View style={styles.categoryInfo}>
+                  <Text style={styles.categoryName}>{row.category}</Text>
+                  <Text style={styles.categoryMeta}>
+                    {row.removed}/{row.count} removed
+                  </Text>
+                </View>
+                <Text style={styles.categoryPct}>{row.pct}%</Text>
+              </View>
+            ))
+          )}
+        </GlassCard>
+
+        {/* 7. Tier 1 quick reference */}
+        <GlassCard style={{ marginBottom: 0 }}>
+          <SectionTitle>Tier 1 – Crucial Brokers</SectionTitle>
+          {tier1.length === 0 ? (
+            <Text style={styles.emptyText}>No Tier 1 brokers tracked.</Text>
+          ) : (
+            tier1.map((row) => (
+              <View key={row.name} style={styles.brokerRow}>
+                <View style={styles.brokerInfo}>
+                  <Text style={styles.brokerName}>{row.name}</Text>
+                  <Text style={styles.brokerMeta}>
+                    {(row.difficulty ?? '—') +
+                      (row.estProcessingDays ? ` · ~${row.estProcessingDays}d` : '')}
+                  </Text>
+                </View>
+                <View style={styles.brokerStatusWrap}>
+                  <View
+                    style={[styles.statusBadge, { borderColor: statusColor(row.status) }]}
+                  >
+                    <Text style={[styles.statusBadgeText, { color: statusColor(row.status) }]}>
+                      {STATUS_LABEL[row.status] ?? row.status}
+                    </Text>
+                  </View>
+                  {row.verified && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color={COLOR.successStart}
+                      style={{ marginTop: 4 }}
+                    />
+                  )}
+                </View>
+              </View>
+            ))
+          )}
+        </GlassCard>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+const StatPill = ({
+  label,
+  value,
+  color = COLOR.textMuted,
+}: {
+  label: string;
+  value: number;
+  color?: string;
+}) => (
+  <View style={styles.statPill}>
+    <Text style={[styles.statPillValue, { color }]}>{value}</Text>
+    <Text style={styles.statPillLabel}>{label}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  safeArea: {
+  safeArea: { flex: 1, backgroundColor: COLOR.deepVoid },
+  loader: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLOR.deepVoid,
   },
-  backgroundGlow: {
-    position: 'absolute',
-    top: -120,
-    left: -60,
-    right: -60,
-    height: 360,
+  backgroundGlow: { position: 'absolute', top: -120, left: -60, right: -60, height: 360 },
+  backgroundGradient: { flex: 1, borderRadius: 999, opacity: 0.6 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 100 },
+  title: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 28,
+    color: COLOR.white,
   },
-  backgroundGradient: {
-    flex: 1,
-    borderRadius: 999,
-    opacity: 0.6,
+  subtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: COLOR.textMuted,
+    marginTop: 6,
+    marginBottom: 24,
   },
-  content: {
-    flex: 1,
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
   },
-  scrollContent: {
+  statCard: {
+    width: '47.5%',
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    backgroundColor: COLOR.glassBg,
+    borderColor: COLOR.glassBorder,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
   },
-  stageBase: {
-    width: '100%',
-    minHeight: 640,
-    justifyContent: 'space-between',
+  statValue: { fontFamily: 'Outfit_800ExtraBold', fontSize: 30, marginBottom: 2 },
+  statLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: COLOR.white,
+    textAlign: 'center',
   },
-  stageSpacing: {
-    gap: 32,
+  statSub: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: COLOR.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
   },
   glassCard: {
     backgroundColor: COLOR.glassBg,
     borderColor: COLOR.glassBorder,
     borderWidth: 1,
-    borderRadius: 24,
-  },
-  glassCardBody: {
+    borderRadius: 20,
     padding: 20,
+    marginBottom: 16,
   },
-  gradientPressable: {
-    width: '100%',
+  sectionTitle: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 16,
+    color: COLOR.white,
+    marginBottom: 16,
   },
-  gradientAnimated: {
+  progressBlock: { marginBottom: 16 },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  progressLabel: { fontFamily: 'Inter_400Regular', fontSize: 13, color: COLOR.textMuted },
+  progressPct: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  progressTrack: {
+    height: 8,
     borderRadius: 999,
+    backgroundColor: COLOR.trackBg,
     overflow: 'hidden',
   },
-  gradientButton: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 999,
-    alignItems: 'center',
-  },
-  buttonLabel: {
-    fontFamily: 'Outfit_600SemiBold',
-    letterSpacing: 1,
-    fontSize: 16,
-  },
-  stageIndicator: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    gap: 8,
-  },
-  stageDots: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  stageDot: {
+  progressFill: { height: 8, borderRadius: 999 },
+  tierRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  tierCard: {
     flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 999,
-  },
-  stageDotActive: {
-    backgroundColor: COLOR.nuclearStart,
-    shadowColor: COLOR.nuclearStart,
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    shadowOffset: { height: 0, width: 0 },
-  },
-  stageIndicatorText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: COLOR.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  statusChip: {
-    fontFamily: 'Inter_600SemiBold',
-    color: COLOR.nuclearStart,
-    fontSize: 12,
-    letterSpacing: 2,
-    marginBottom: 20,
-  },
-  heroWrapper: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  heroOrb: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: COLOR.nuclearEnd,
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  heroCore: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#021226',
-    borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  heroScanLines: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    backgroundColor: COLOR.glassBg,
+    borderColor: COLOR.glassBorder,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  headline: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 34,
-    color: '#ffffff',
-    lineHeight: 38,
-    textTransform: 'uppercase',
-  },
-  subhead: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 16,
-  },
-  caption: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    marginTop: 12,
-    letterSpacing: 1,
-  },
-  sectionLabel: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontSize: 14,
-    marginBottom: 24,
-  },
-  progressRingContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  progressOuter: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 120,
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressHollow: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: COLOR.deepVoid,
-  },
-  progressInner: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressValue: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 48,
-    color: '#ffffff',
-  },
-  progressMessage: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: COLOR.nuclearStart,
-    marginTop: 8,
-  },
-  streamContainer: {
-    gap: 12,
-  },
-  streamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-  },
-  streamIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  streamCopy: {
-    flex: 1,
-  },
-  streamTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#ffffff',
-    fontSize: 14,
-  },
-  streamDetail: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 12,
-  },
-  streamSeverity: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  footerCaption: {
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  metricValue: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 56,
-    color: COLOR.warningEnd,
-    lineHeight: 56,
-    marginBottom: 4,
-  },
-  metricLabel: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 14,
-    color: COLOR.textMuted,
-    letterSpacing: 2,
-    marginBottom: 16,
-  },
-  evidenceCard: {
-    marginTop: 24,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#ffffff',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  evidenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  evidenceIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 84, 112, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  evidenceTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    color: '#ffffff',
-    fontSize: 14,
-  },
-  evidenceDetail: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 12,
-  },
-  evidenceBadge: {
-    fontFamily: 'Inter_500Medium',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    paddingVertical: 18,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: 'hidden',
-    color: '#ffffff',
-    fontSize: 10,
+    alignItems: 'center',
   },
-  ctaSubtext: {
+  tierValue: { fontFamily: 'Outfit_800ExtraBold', fontSize: 22, color: COLOR.white },
+  tierLabel: {
     fontFamily: 'Inter_400Regular',
+    fontSize: 11,
     color: COLOR.textMuted,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  trustBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 24,
-    paddingVertical: 16,
-  },
-  trustItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  trustText: {
-    fontFamily: 'Inter_500Medium',
-    color: COLOR.textMuted,
-    fontSize: 10,
-  },
-  navHeader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 32,
-    paddingTop: 8,
-  },
-  logoImage: {
-    width: 40,
-    height: 40,
-  },
-  successRingWrapper: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  successRingOuter: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successRingInner: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLOR.deepVoid,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metricRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 32,
-  },
-  metricCard: {
-    flex: 1,
-    padding: 12,
-    alignItems: 'center',
-  },
-  metricCardValue: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 24,
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  metricCardLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 10,
-    color: COLOR.textMuted,
+    marginTop: 4,
     textAlign: 'center',
   },
-  liveLogCard: {
-    marginTop: 24,
+  breakdownBlock: {
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLOR.hairline,
   },
-  logRow: {
+  breakdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  breakdownTier: { fontFamily: 'Outfit_600SemiBold', fontSize: 14, color: COLOR.white },
+  breakdownTotal: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted },
+  statPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statPill: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minWidth: 64,
+  },
+  statPillValue: { fontFamily: 'Outfit_600SemiBold', fontSize: 15 },
+  statPillLabel: { fontFamily: 'Inter_400Regular', fontSize: 10, color: COLOR.textMuted },
+  categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLOR.hairline,
   },
-  logIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  categoryInfo: { flex: 1, paddingRight: 12 },
+  categoryName: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: COLOR.white },
+  categoryMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted, marginTop: 2 },
+  categoryPct: { fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: COLOR.successStart },
+  brokerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLOR.hairline,
   },
-  logText: {
-    fontFamily: 'Inter_400Regular',
-    color: COLOR.textMuted,
-    fontSize: 12,
-    flex: 1,
+  brokerInfo: { flex: 1, paddingRight: 12 },
+  brokerName: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: COLOR.white },
+  brokerMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted, marginTop: 2 },
+  brokerStatusWrap: { alignItems: 'flex-end' },
+  statusBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  dashboardActions: {
-    alignItems: 'center',
-  },
-  restartLink: {
-    padding: 12,
-  },
-  restartText: {
-    fontFamily: 'Inter_500Medium',
-    color: COLOR.textMuted,
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
+  statusBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: COLOR.textMuted },
 });

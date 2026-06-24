@@ -1,112 +1,83 @@
 import { v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
+import { getCurrentUser } from "./users";
 
-/**
- * Get subscription by Clerk ID (for mobile app)
- */
-export const getByClerkId = query({
-    args: { clerkId: v.string() },
-    handler: async (ctx, args) => {
-        return await ctx.db
-            .query("subscriptions")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-            .first();
-    },
+const FREE = { plan: "free", planLabel: "Free Plan", isPaid: false } as const;
+
+// Returns the current user's entitlement, replacing the old Whop /api/whop/plan route.
+export const getEntitlement = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return { ...FREE };
+
+    const sub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (!sub || !sub.isPaid) return { ...FREE };
+
+    return {
+      plan: sub.plan || "paid",
+      planLabel: sub.planLabel || "Paid Plan",
+      isPaid: true,
+      status: sub.status,
+      currentPeriodEnd: sub.currentPeriodEnd ?? null,
+    };
+  },
 });
 
-/**
- * Upsert subscription from RevenueCat webhook
- */
+const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
+
+// Called by the RevenueCat webhook (convex/http.ts). Keyed by app_user_id == Clerk id.
 export const upsertFromRevenueCat = internalMutation({
-    args: {
-        clerkId: v.string(),
-        status: v.union(
-            v.literal("none"),
-            v.literal("active"),
-            v.literal("trialing"),
-            v.literal("past_due"),
-            v.literal("cancelled"),
-            v.literal("expired")
-        ),
-        planId: v.optional(v.string()),
-        planName: v.optional(v.string()),
-        providerSubscriptionId: v.optional(v.string()),
-        providerCustomerId: v.optional(v.string()),
-        hasAppAccess: v.boolean(),
-        currentPeriodStart: v.optional(v.number()),
-        currentPeriodEnd: v.optional(v.number()),
-    },
-    handler: async (ctx, args) => {
-        // Find the user by Clerk ID
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-            .first();
+  args: {
+    revenueCatAppUserId: v.string(),
+    status: v.string(),
+    plan: v.string(),
+    planLabel: v.string(),
+    entitlementId: v.optional(v.string()),
+    productId: v.optional(v.string()),
+    store: v.optional(v.string()),
+    currentPeriodEnd: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const isPaid = ACTIVE_STATUSES.has(args.status.toLowerCase());
 
-        if (!user) {
-            // User doesn't exist yet - create them first
-            const now = Date.now();
-            const userId = await ctx.db.insert("users", {
-                clerkId: args.clerkId,
-                createdAt: now,
-                updatedAt: now,
-            });
+    // app_user_id is the Clerk id; link to the Convex user if it exists yet.
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) =>
+        q.eq("clerkId", args.revenueCatAppUserId)
+      )
+      .unique();
 
-            // Create subscription
-            return await ctx.db.insert("subscriptions", {
-                userId,
-                clerkId: args.clerkId,
-                status: args.status,
-                planId: args.planId,
-                planName: args.planName,
-                provider: "revenuecat",
-                providerSubscriptionId: args.providerSubscriptionId,
-                providerCustomerId: args.providerCustomerId,
-                hasAppAccess: args.hasAppAccess,
-                currentPeriodStart: args.currentPeriodStart,
-                currentPeriodEnd: args.currentPeriodEnd,
-                createdAt: now,
-                updatedAt: now,
-            });
-        }
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_rc_app_user_id", (q) =>
+        q.eq("revenueCatAppUserId", args.revenueCatAppUserId)
+      )
+      .unique();
 
-        // Check if subscription exists
-        const existingSub = await ctx.db
-            .query("subscriptions")
-            .withIndex("by_user_id", (q) => q.eq("userId", user._id))
-            .first();
+    const doc = {
+      userId: user?._id,
+      revenueCatAppUserId: args.revenueCatAppUserId,
+      status: args.status,
+      isPaid,
+      plan: isPaid ? args.plan : "free",
+      planLabel: isPaid ? args.planLabel : "Free Plan",
+      provider: "revenuecat",
+      entitlementId: args.entitlementId,
+      productId: args.productId,
+      store: args.store,
+      currentPeriodEnd: args.currentPeriodEnd,
+    };
 
-        const now = Date.now();
-
-        if (existingSub) {
-            await ctx.db.patch(existingSub._id, {
-                status: args.status,
-                planId: args.planId,
-                planName: args.planName,
-                providerSubscriptionId: args.providerSubscriptionId,
-                providerCustomerId: args.providerCustomerId,
-                hasAppAccess: args.hasAppAccess,
-                currentPeriodStart: args.currentPeriodStart,
-                currentPeriodEnd: args.currentPeriodEnd,
-                updatedAt: now,
-            });
-            return existingSub._id;
-        } else {
-            return await ctx.db.insert("subscriptions", {
-                userId: user._id,
-                clerkId: args.clerkId,
-                status: args.status,
-                planId: args.planId,
-                planName: args.planName,
-                provider: "revenuecat",
-                providerSubscriptionId: args.providerSubscriptionId,
-                providerCustomerId: args.providerCustomerId,
-                hasAppAccess: args.hasAppAccess,
-                currentPeriodStart: args.currentPeriodStart,
-                currentPeriodEnd: args.currentPeriodEnd,
-                createdAt: now,
-                updatedAt: now,
-            });
-        }
-    },
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return existing._id;
+    }
+    return await ctx.db.insert("subscriptions", doc);
+  },
 });
