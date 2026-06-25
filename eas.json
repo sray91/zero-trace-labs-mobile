@@ -9,30 +9,24 @@
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "$EXPO_PUBLIC_CONVEX_URL",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "$EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
-        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "$EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY"
+        "EXPO_PUBLIC_CONVEX_URL": "https://secret-mink-940.convex.cloud",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuMHRyYWNlbGFicy5jb20k"
       }
     },
     "preview": {
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "$EXPO_PUBLIC_CONVEX_URL",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "$EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
-        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "$EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY"
+        "EXPO_PUBLIC_CONVEX_URL": "https://secret-mink-940.convex.cloud",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuMHRyYWNlbGFicy5jb20k"
       }
     },
     "production": {
       "autoIncrement": true,
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "$EXPO_PUBLIC_CONVEX_URL",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "$EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
-        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "$EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY"
+        "EXPO_PUBLIC_CONVEX_URL": "https://secret-mink-940.convex.cloud",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuMHRyYWNlbGFicy5jb20k"
       }
     }
   },
