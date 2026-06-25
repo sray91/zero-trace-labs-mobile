@@ -7,27 +7,15 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "$EXPO_PUBLIC_CONVEX_URL",
-        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "$EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY"
-      }
+      "environment": "production"
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "$EXPO_PUBLIC_CONVEX_URL",
-        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "$EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY"
-      }
+      "environment": "production"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "$EXPO_PUBLIC_CONVEX_URL",
-        "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY": "$EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY": "$EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY"
-      }
+      "environment": "production"
     }
   },
   "submit": {
