@@ -21,19 +21,28 @@ export function LoginScreen() {
     }
 
     try {
-      const result = await signIn.create({
-        identifier: email,
+      // Start the sign-in, then explicitly attempt the password first factor.
+      // Passing `password` straight into create() can return an intermediate
+      // status (needs_first_factor) on this instance instead of completing,
+      // which previously surfaced as a generic "Sign in failed" message.
+      const attempt = await signIn.create({ identifier: email });
+      const result = await attempt.attemptFirstFactor({
+        strategy: 'password',
         password,
       });
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)');
+      } else if (result.status === 'needs_second_factor') {
+        setError('Two-factor authentication is required for this account.');
+      } else if (result.status === 'needs_new_password') {
+        setError('Your password must be reset. Use “Forgot Password?” to set a new one.');
       } else {
-        setError('Sign in failed. Please try again.');
+        setError(`Sign in could not be completed (status: ${result.status}).`);
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.message || 'An error occurred during sign in');
+      setError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'An error occurred during sign in');
     }
   };
 
