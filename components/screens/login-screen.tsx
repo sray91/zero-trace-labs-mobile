@@ -21,24 +21,21 @@ export function LoginScreen() {
     }
 
     try {
-      // Start the sign-in, then explicitly attempt the password first factor.
-      // Passing `password` straight into create() can return an intermediate
-      // status (needs_first_factor) on this instance instead of completing,
-      // which previously surfaced as a generic "Sign in failed" message.
-      const attempt = await signIn.create({ identifier: email });
-      const result = await attempt.attemptFirstFactor({
-        strategy: 'password',
-        password,
-      });
+      // Single-call sign-in: pass identifier + password together. This is the
+      // standard Clerk flow and completes in one round-trip for a password-only
+      // account. (A previous two-step create()/attemptFirstFactor() variant
+      // returned a spurious needs_second_factor on this account even though it
+      // has no MFA enrolled — see git history for build 43.)
+      const result = await signIn.create({ identifier: email, password });
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)');
-      } else if (result.status === 'needs_second_factor') {
-        setError('Two-factor authentication is required for this account.');
       } else if (result.status === 'needs_new_password') {
         setError('Your password must be reset. Use “Forgot Password?” to set a new one.');
       } else {
+        // No second factor is configured on this account/instance, so any other
+        // status is unexpected — surface it instead of asserting "2FA required".
         setError(`Sign in could not be completed (status: ${result.status}).`);
       }
     } catch (err: any) {
