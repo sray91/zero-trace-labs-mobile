@@ -22,6 +22,12 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+// Referenced here in app code (not just inside @clerk/clerk-expo) so Expo's
+// EXPO_PUBLIC_* inlining bakes the value into the production bundle — node_modules
+// reads of process.env are NOT inlined, which is why relying on Clerk's auto-read
+// crashed release builds with "Missing publishable key".
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Outfit_400Regular,
@@ -43,7 +49,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider tokenCache={tokenCache}>
+    <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <AuthProvider>
           <ProtectedRoute>
