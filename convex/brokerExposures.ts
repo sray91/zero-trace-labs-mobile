@@ -26,8 +26,15 @@ export const upsert = mutation({
     foundAt: v.optional(v.number()),
     submittedAt: v.optional(v.number()),
     removedAt: v.optional(v.number()),
+    verifiedRemoved: v.optional(v.boolean()),
     recheckAt: v.optional(v.number()),
     notes: v.optional(v.string()),
+    searchedAt: v.optional(v.number()),
+    searchTerm: v.optional(v.string()),
+    whatWasFound: v.optional(v.string()),
+    screenshotTaken: v.optional(v.boolean()),
+    actionTaken: v.optional(v.string()),
+    followUpNeeded: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
@@ -56,8 +63,15 @@ export const upsert = mutation({
       foundAt: patch.foundAt,
       submittedAt: patch.submittedAt,
       removedAt: patch.removedAt,
+      verifiedRemoved: patch.verifiedRemoved,
       recheckAt: patch.recheckAt,
       notes: patch.notes,
+      searchedAt: patch.searchedAt,
+      searchTerm: patch.searchTerm,
+      whatWasFound: patch.whatWasFound,
+      screenshotTaken: patch.screenshotTaken,
+      actionTaken: patch.actionTaken,
+      followUpNeeded: patch.followUpNeeded,
     });
     return (await ctx.db.get(id))!;
   },

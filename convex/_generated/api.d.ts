@@ -15,6 +15,8 @@ import type * as dashboard from "../dashboard.js";
 import type * as dataSources from "../dataSources.js";
 import type * as http from "../http.js";
 import type * as removalRequests from "../removalRequests.js";
+import type * as scanner from "../scanner.js";
+import type * as scannerInternal from "../scannerInternal.js";
 import type * as searchHistory from "../searchHistory.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
@@ -33,6 +35,8 @@ declare const fullApi: ApiFromModules<{
   dataSources: typeof dataSources;
   http: typeof http;
   removalRequests: typeof removalRequests;
+  scanner: typeof scanner;
+  scannerInternal: typeof scannerInternal;
   searchHistory: typeof searchHistory;
   subscriptions: typeof subscriptions;
   users: typeof users;

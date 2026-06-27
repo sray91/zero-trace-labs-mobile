@@ -82,21 +82,33 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_tier", ["tier"]),
 
+  // Per-user, per-broker working record. Combines the spreadsheet's "🎯 Master
+  // Tracker" removal columns (status/dates/confirmation) and the "🔍 Search Log"
+  // columns (searchedAt/searchTerm/whatWasFound/screenshotTaken/actionTaken/
+  // followUpNeeded) into one row, since both tabs are keyed by user + broker.
   brokerExposures: defineTable({
     userId: v.id("users"),
     dataSourceId: v.id("dataSources"),
-    exposureStatus: v.string(), // unchecked | found | not_found
+    exposureStatus: v.string(), // unchecked | found | not_found  (Search Log "Data Found?")
     // not_started | searched_not_found | searched_found | submitted | removed |
     // reappeared | handled_by_service | skipped (drives the user dashboard breakdown)
     removalStatus: v.string(),
-    listingUrl: v.optional(v.string()),
+    listingUrl: v.optional(v.string()), // Profile URL Found
     confirmationRef: v.optional(v.string()),
     checklist: v.optional(v.any()),
     foundAt: v.optional(v.number()),
     submittedAt: v.optional(v.number()),
-    removedAt: v.optional(v.number()),
-    recheckAt: v.optional(v.number()),
+    removedAt: v.optional(v.number()), // Date Verified
+    verifiedRemoved: v.optional(v.boolean()), // Verified Removed? (Y/N)
+    recheckAt: v.optional(v.number()), // Re-Check Due Date
     notes: v.optional(v.string()),
+    // ---- Search Log columns ----
+    searchedAt: v.optional(v.number()), // Date Searched
+    searchTerm: v.optional(v.string()), // Search Term Used
+    whatWasFound: v.optional(v.string()), // What Was Found
+    screenshotTaken: v.optional(v.boolean()), // Screenshot Taken?
+    actionTaken: v.optional(v.string()), // Action Taken
+    followUpNeeded: v.optional(v.boolean()), // Follow-Up Needed?
   })
     .index("by_user", ["userId"])
     .index("by_user_and_source", ["userId", "dataSourceId"]),
