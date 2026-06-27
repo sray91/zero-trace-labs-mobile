@@ -120,7 +120,8 @@ export const getUserDetail = query({
 
 // ---- Mutations: edit on behalf of a user ----
 
-// Admin variant of brokerExposures.upsert that takes an explicit userId.
+// Admin variant of brokerExposures.upsert that takes an explicit userId. Covers
+// every Master Tracker + Search Log column so the admin can edit any field.
 export const setExposure = mutation({
   args: {
     userId: v.id("users"),
@@ -132,8 +133,16 @@ export const setExposure = mutation({
     foundAt: v.optional(v.number()),
     submittedAt: v.optional(v.number()),
     removedAt: v.optional(v.number()),
+    verifiedRemoved: v.optional(v.boolean()),
     recheckAt: v.optional(v.number()),
     notes: v.optional(v.string()),
+    // Search Log columns
+    searchedAt: v.optional(v.number()),
+    searchTerm: v.optional(v.string()),
+    whatWasFound: v.optional(v.string()),
+    screenshotTaken: v.optional(v.boolean()),
+    actionTaken: v.optional(v.string()),
+    followUpNeeded: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
@@ -161,9 +170,70 @@ export const setExposure = mutation({
       foundAt: patch.foundAt,
       submittedAt: patch.submittedAt,
       removedAt: patch.removedAt,
+      verifiedRemoved: patch.verifiedRemoved,
       recheckAt: patch.recheckAt,
       notes: patch.notes,
+      searchedAt: patch.searchedAt,
+      searchTerm: patch.searchTerm,
+      whatWasFound: patch.whatWasFound,
+      screenshotTaken: patch.screenshotTaken,
+      actionTaken: patch.actionTaken,
+      followUpNeeded: patch.followUpNeeded,
     });
+  },
+});
+
+// Edit a user's onboarding/PII profile on their behalf. The data remover needs
+// the user's legal name, DOB and address to run broker searches, so the admin can
+// correct/complete these fields here. Admin only.
+export const updateUserProfile = mutation({
+  args: {
+    userId: v.id("users"),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
+    addressLine1: v.optional(v.string()),
+    addressLine2: v.optional(v.string()),
+    city: v.optional(v.string()),
+    state: v.optional(v.string()),
+    zipCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const { userId, ...patch } = args;
+
+    const existing = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+      return existing._id;
+    }
+    return await ctx.db.insert("userProfiles", {
+      userId,
+      welcomeCompleted: false,
+      ...patch,
+    });
+  },
+});
+
+// Promote a user to admin (or revoke it). Clerk's publicMetadata.role is the source
+// of truth and is updated separately via the /api/admin/set-role route; this mirrors
+// the change into Convex immediately so the console reflects it without waiting on the
+// Clerk webhook to re-sync. Admin only; an admin cannot revoke their own access (which
+// would otherwise lock them out of this console).
+export const setUserRole = mutation({
+  args: { userId: v.id("users"), role: v.union(v.literal("admin"), v.null()) },
+  handler: async (ctx, { userId, role }) => {
+    const admin = await requireAdmin(ctx);
+    if (admin._id === userId && role === null) {
+      throw new Error("You cannot revoke your own admin access");
+    }
+    await ctx.db.patch(userId, { role: role ?? undefined });
+    return userId;
   },
 });
 
