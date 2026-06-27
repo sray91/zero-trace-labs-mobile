@@ -9,7 +9,7 @@
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "https://secret-mink-940.convex.cloud",
+        "EXPO_PUBLIC_CONVEX_URL": "https://standing-swordfish-884.convex.cloud",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuMHRyYWNlbGFicy5jb20k"
       }
     },
