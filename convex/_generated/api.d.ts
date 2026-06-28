@@ -14,6 +14,7 @@ import type * as brokerSeed from "../brokerSeed.js";
 import type * as dashboard from "../dashboard.js";
 import type * as dataSources from "../dataSources.js";
 import type * as http from "../http.js";
+import type * as inbox from "../inbox.js";
 import type * as removalRequests from "../removalRequests.js";
 import type * as scanner from "../scanner.js";
 import type * as scannerInternal from "../scannerInternal.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   dashboard: typeof dashboard;
   dataSources: typeof dataSources;
   http: typeof http;
+  inbox: typeof inbox;
   removalRequests: typeof removalRequests;
   scanner: typeof scanner;
   scannerInternal: typeof scannerInternal;

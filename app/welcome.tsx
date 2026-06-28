@@ -168,7 +168,7 @@ export default function WelcomeScreen() {
         welcomeCompleted: true,
         welcomeStep: TOTAL_STEPS,
       });
-      router.replace('/(tabs)');
+      router.replace('/onboarding-complete');
     } catch (e) {
       console.error('Error completing welcome:', e);
       setError('Failed to complete setup. Please try again.');

@@ -127,4 +127,47 @@ http.route({
   }),
 });
 
+// ---- Inbound email webhook: per-user proxy inbox ----
+// Cloudflare Email Routing (catch-all -> Worker) parses each message and POSTs JSON
+// here. The Worker must send the shared secret in `x-inbound-secret`. Receive-only:
+// messages land in `inboxMessages` for the admin to read in the user detail page.
+http.route({
+  path: "/inbound-email",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const secret = process.env.INBOUND_EMAIL_SECRET;
+    if (!secret) {
+      return new Response("Missing INBOUND_EMAIL_SECRET", { status: 500 });
+    }
+    if (request.headers.get("x-inbound-secret") !== secret) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    const to = typeof body?.to === "string" ? body.to : undefined;
+    const from = typeof body?.from === "string" ? body.from : undefined;
+    if (!to || !from) {
+      return new Response("Missing to/from", { status: 400 });
+    }
+
+    await ctx.runMutation(internal.inbox.receiveInbound, {
+      to,
+      from,
+      subject: typeof body.subject === "string" ? body.subject : undefined,
+      text: typeof body.text === "string" ? body.text : undefined,
+      html: typeof body.html === "string" ? body.html : undefined,
+      receivedAt:
+        typeof body.receivedAt === "number" ? body.receivedAt : undefined,
+    });
+
+    return new Response(null, { status: 200 });
+  }),
+});
+
 export default http;
