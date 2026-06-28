@@ -1,3 +1,4 @@
+import { WorkingIndicator } from '@/components/dashboard/working-indicator';
 import { api } from '@/convex/_generated/api';
 import { ACCENT, AccentRole, COLOR, STATUS_LABEL, statusColor, TIER_LABEL } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -112,6 +113,9 @@ export default function DashboardScreen() {
           Tracking {total} data brokers
           {lastUpdated ? ` · Last updated ${formatDate(lastUpdated)}` : ' · No activity yet'}
         </Text>
+
+        {/* Subtle "background activity" heartbeat */}
+        <WorkingIndicator />
 
         {/* 2. Summary stat cards */}
         <View style={styles.statGrid}>
@@ -292,7 +296,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLOR.textMuted,
     marginTop: 6,
-    marginBottom: 24,
+    marginBottom: 14,
   },
   statGrid: {
     flexDirection: 'row',

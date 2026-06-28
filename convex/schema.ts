@@ -14,7 +14,14 @@ export default defineSchema({
     // Synced from Clerk publicMetadata.role by the Clerk webhook (convex/http.ts).
     // "admin" unlocks the admin console; absent/anything else = regular user.
     role: v.optional(v.string()),
-  }).index("by_clerk_id", ["clerkId"]),
+    // Per-user proxy/alias address (e.g. u-ab12cd34@mail.0tracelabs.com) that the
+    // admin types into broker opt-out forms. Broker verification emails sent here are
+    // routed (Cloudflare Email Routing -> /inbound-email) into `inboxMessages`.
+    // Generated on first sync (convex/users.ts) and backfilled for existing users.
+    proxyEmail: v.optional(v.string()),
+  })
+    .index("by_clerk_id", ["clerkId"])
+    .index("by_proxy_email", ["proxyEmail"]),
 
   // Entitlement state, kept in sync by the RevenueCat webhook (see convex/http.ts).
   // `revenueCatAppUserId` equals the Clerk user id so iOS and web resolve to the
@@ -146,4 +153,24 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"]),
+
+  // Inbound mail received at a user's proxyEmail. Written by the /inbound-email HTTP
+  // endpoint (fed by Cloudflare Email Routing). Receive-only: the admin reads these
+  // in the user detail page and clicks the broker verification links. No outbound.
+  inboxMessages: defineTable({
+    userId: v.id("users"),
+    proxyEmail: v.string(), // the recipient alias it arrived at
+    fromAddress: v.string(),
+    subject: v.optional(v.string()),
+    text: v.optional(v.string()),
+    html: v.optional(v.string()),
+    receivedAt: v.number(),
+    isRead: v.boolean(),
+    // http(s) links pulled from the body, verification-looking ones first.
+    extractedLinks: v.array(v.string()),
+    // Best-effort broker match by sender domain, for tagging in the UI.
+    dataSourceId: v.optional(v.id("dataSources")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_proxy_email", ["proxyEmail"]),
 });

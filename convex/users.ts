@@ -145,6 +145,17 @@ export const upsertProfile = mutation({
 });
 
 // Called by the Clerk webhook (convex/http.ts) on user.created / user.updated.
+// Non-guessable per-user proxy address. The domain comes from PROXY_EMAIL_DOMAIN on
+// the Convex deployment (set it to your Cloudflare Email Routing domain).
+const PROXY_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+export function makeProxyEmail(): string {
+  const domain = process.env.PROXY_EMAIL_DOMAIN || "mail.0tracelabs.com";
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, (b) => PROXY_ALPHABET[b % 36]).join("");
+  return `u-${token}@${domain}`;
+}
+
 export const upsertFromClerk = internalMutation({
   args: {
     clerkId: v.string(),
@@ -165,6 +176,8 @@ export const upsertFromClerk = internalMutation({
         name: args.name,
         imageUrl: args.imageUrl,
         role: args.role,
+        // Backfill the proxy address for users created before this feature.
+        proxyEmail: existing.proxyEmail ?? makeProxyEmail(),
       });
       return existing._id;
     }
@@ -175,6 +188,7 @@ export const upsertFromClerk = internalMutation({
       name: args.name,
       imageUrl: args.imageUrl,
       role: args.role,
+      proxyEmail: makeProxyEmail(),
     });
 
     // Link any subscription that arrived (via RevenueCat) before the user existed.
@@ -209,5 +223,38 @@ export const deleteFromClerk = internalMutation({
     if (profile) await ctx.db.delete(profile._id);
 
     await ctx.db.delete(user._id);
+  },
+});
+
+// Ensure a single user has a proxy address. Admin-only; called lazily from the user
+// detail page so existing users get one without waiting for the next Clerk sync.
+export const ensureProxyEmail = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    await requireAdmin(ctx);
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    if (user.proxyEmail) return user.proxyEmail;
+    const proxyEmail = makeProxyEmail();
+    await ctx.db.patch(userId, { proxyEmail });
+    return proxyEmail;
+  },
+});
+
+// One-shot backfill for every user missing a proxy address. Internal so it can be run
+// from the CLI without an authenticated admin:
+//   npx convex run users:backfillProxyEmails
+export const backfillProxyEmails = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    let updated = 0;
+    for (const u of users) {
+      if (!u.proxyEmail) {
+        await ctx.db.patch(u._id, { proxyEmail: makeProxyEmail() });
+        updated++;
+      }
+    }
+    return { updated };
   },
 });
