@@ -19,18 +19,20 @@ import {
   View,
 } from 'react-native';
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 const STEP_TITLE: Record<number, string> = {
-  1: "Welcome! Let's get started",
-  2: 'Privacy & consent',
-  3: "You're all set",
+  1: 'Our promise to you',
+  2: "Let's get started",
+  3: 'Privacy & consent',
+  4: "You're all set",
 };
 
 const STEP_SUBTITLE: Record<number, string> = {
-  1: 'Tell us about yourself so our team can find and remove your data from data brokers.',
-  2: 'Review and accept how your information is used.',
-  3: 'Your account is ready. Track your removal progress on the dashboard.',
+  1: 'Before you share anything, here’s exactly what we do — and never do — with your information.',
+  2: 'Tell us about yourself so our team can find and remove your data from data brokers.',
+  3: 'Review and accept how your information is used.',
+  4: 'Your account is ready. Track your removal progress on the dashboard.',
 };
 
 interface FieldProps {
@@ -145,7 +147,7 @@ export default function WelcomeScreen() {
         city,
         state: stateField,
         zipCode,
-        welcomeStep: 1,
+        welcomeStep: 2,
       });
       return true;
     } catch (e) {
@@ -178,7 +180,7 @@ export default function WelcomeScreen() {
 
   const handleNext = async () => {
     setError('');
-    if (step === 1) {
+    if (step === 2) {
       if (!firstName || !lastName || !addressLine1 || !city || !stateField || !zipCode) {
         setError('Please fill in all required fields.');
         return;
@@ -186,7 +188,7 @@ export default function WelcomeScreen() {
       const saved = await savePersonalInfo();
       if (!saved) return;
     }
-    if (step === 2) {
+    if (step === 3) {
       if (!privacyConsent || !termsAccepted) {
         setError('Please accept the privacy policy and terms of service to continue.');
         return;
@@ -247,8 +249,53 @@ export default function WelcomeScreen() {
             </View>
           ) : null}
 
-          {/* Step 1 — personal info */}
+          {/* Step 1 — our promise */}
           {step === 1 && (
+            <View style={styles.card}>
+              <View style={styles.promiseIconWrap}>
+                <LinearGradient
+                  colors={[COLOR.nuclearStart, COLOR.nuclearEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.promiseIcon}
+                >
+                  <Ionicons name="lock-closed" size={30} color={COLOR.deepVoid} />
+                </LinearGradient>
+              </View>
+              <Text style={styles.promiseHeadline}>
+                We will never, ever sell your information to data brokers.
+              </Text>
+              <Text style={styles.promiseBody}>
+                The information you&apos;re about to share is used for one purpose only: so our
+                team can find your personal data already exposed on data broker sites and get it
+                removed. We fight data brokers — we never feed them.
+              </Text>
+
+              <View style={styles.promiseList}>
+                <View style={styles.promiseRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={COLOR.successStart} />
+                  <Text style={styles.promiseRowText}>
+                    Used only to locate and remove your existing data
+                  </Text>
+                </View>
+                <View style={styles.promiseRow}>
+                  <Ionicons name="close-circle" size={20} color={COLOR.danger} />
+                  <Text style={styles.promiseRowText}>
+                    Never sold, rented, or shared with data brokers
+                  </Text>
+                </View>
+                <View style={styles.promiseRow}>
+                  <Ionicons name="close-circle" size={20} color={COLOR.danger} />
+                  <Text style={styles.promiseRowText}>
+                    Never used for advertising or any other purpose
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Step 2 — personal info */}
+          {step === 2 && (
             <View style={styles.card}>
               <View style={styles.row}>
                 <View style={styles.half}>
@@ -314,8 +361,8 @@ export default function WelcomeScreen() {
             </View>
           )}
 
-          {/* Step 2 — privacy & consent */}
-          {step === 2 && (
+          {/* Step 3 — privacy & consent */}
+          {step === 3 && (
             <View style={styles.card}>
               <View style={styles.infoRow}>
                 <Ionicons name="shield-checkmark" size={20} color={COLOR.nuclearStart} />
@@ -346,8 +393,8 @@ export default function WelcomeScreen() {
             </View>
           )}
 
-          {/* Step 3 — completion */}
-          {step === 3 && (
+          {/* Step 4 — completion */}
+          {step === 4 && (
             <View style={styles.card}>
               <View style={styles.successWrap}>
                 <LinearGradient
@@ -481,6 +528,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  promiseIconWrap: { alignItems: 'center', marginBottom: 20 },
+  promiseIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promiseHeadline: {
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 20,
+    lineHeight: 28,
+    color: COLOR.white,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  promiseBody: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLOR.textMuted,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  promiseList: {
+    gap: 14,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLOR.hairline,
+  },
+  promiseRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  promiseRowText: {
+    flex: 1,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLOR.white,
   },
   infoRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   infoText: {
