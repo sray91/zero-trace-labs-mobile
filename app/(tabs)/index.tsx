@@ -1,13 +1,16 @@
+import { GlassCard, SectionTitle } from '@/components/dashboard/ui';
 import { WorkingIndicator } from '@/components/dashboard/working-indicator';
 import { api } from '@/convex/_generated/api';
-import { ACCENT, AccentRole, COLOR, STATUS_LABEL, statusColor, TIER_LABEL } from '@/lib/theme/colors';
+import { ACCENT, AccentRole, COLOR, TIER_LABEL } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -22,14 +25,6 @@ function formatDate(ms: number): string {
     year: 'numeric',
   });
 }
-
-const GlassCard = ({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: object;
-}) => <View style={[styles.glassCard, style]}>{children}</View>;
 
 const StatCard = ({
   label,
@@ -77,11 +72,8 @@ const ProgressBar = ({
   </View>
 );
 
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <Text style={styles.sectionTitle}>{children}</Text>
-);
-
 export default function DashboardScreen() {
+  const router = useRouter();
   const data = useQuery(api.dashboard.forCurrentUser);
 
   if (data === undefined) {
@@ -92,7 +84,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const { total, tierCounts, summary, completion, byTier, byCategory, tier1, lastUpdated } = data;
+  const { total, tierCounts, summary, completion, lastUpdated } = data;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -179,101 +171,43 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        {/* 5. Status breakdown by tier */}
-        <GlassCard>
-          <SectionTitle>Status Breakdown by Tier</SectionTitle>
-          {byTier.map((row) => (
-            <View key={row.tier} style={styles.breakdownBlock}>
-              <View style={styles.breakdownHeader}>
-                <Text style={styles.breakdownTier}>{TIER_LABEL[row.tier]}</Text>
-                <Text style={styles.breakdownTotal}>{row.total} total</Text>
-              </View>
-              <View style={styles.statPills}>
-                <StatPill label="Not Started" value={row.notStarted} />
-                <StatPill label="Searched – Found" value={row.searchedFound} />
-                <StatPill label="Submitted" value={row.submitted} color={COLOR.warningEnd} />
-                <StatPill label="Removed" value={row.removed} color={COLOR.successStart} />
-                <StatPill label="Handled" value={row.handledByService} color={COLOR.successStart} />
-              </View>
-            </View>
-          ))}
-        </GlassCard>
+        {/* 5. How the removal process works (click-through explainer) */}
+        <Pressable
+          onPress={() => router.push('/how-it-works' as any)}
+          style={({ pressed }) => [styles.nerdCard, styles.linkSpacing, pressed && styles.nerdCardPressed]}
+        >
+          <View style={styles.nerdIconWrap}>
+            <Ionicons name="help-buoy" size={20} color={COLOR.nuclearStart} />
+          </View>
+          <View style={styles.nerdTextWrap}>
+            <Text style={styles.nerdTitle}>How it works</Text>
+            <Text style={styles.nerdSub}>
+              A quick walkthrough of how we remove your data — and why it takes time
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLOR.textMuted} />
+        </Pressable>
 
-        {/* 6. Brokers by category */}
-        <GlassCard>
-          <SectionTitle>Brokers by Category</SectionTitle>
-          {byCategory.length === 0 ? (
-            <Text style={styles.emptyText}>No categories yet.</Text>
-          ) : (
-            byCategory.map((row) => (
-              <View key={row.category} style={styles.categoryRow}>
-                <View style={styles.categoryInfo}>
-                  <Text style={styles.categoryName}>{row.category}</Text>
-                  <Text style={styles.categoryMeta}>
-                    {row.removed}/{row.count} removed
-                  </Text>
-                </View>
-                <Text style={styles.categoryPct}>{row.pct}%</Text>
-              </View>
-            ))
-          )}
-        </GlassCard>
-
-        {/* 7. Tier 1 quick reference */}
-        <GlassCard style={{ marginBottom: 0 }}>
-          <SectionTitle>Tier 1 – Crucial Brokers</SectionTitle>
-          {tier1.length === 0 ? (
-            <Text style={styles.emptyText}>No Tier 1 brokers tracked.</Text>
-          ) : (
-            tier1.map((row) => (
-              <View key={row.name} style={styles.brokerRow}>
-                <View style={styles.brokerInfo}>
-                  <Text style={styles.brokerName}>{row.name}</Text>
-                  <Text style={styles.brokerMeta}>
-                    {(row.difficulty ?? '—') +
-                      (row.estProcessingDays ? ` · ~${row.estProcessingDays}d` : '')}
-                  </Text>
-                </View>
-                <View style={styles.brokerStatusWrap}>
-                  <View
-                    style={[styles.statusBadge, { borderColor: statusColor(row.status) }]}
-                  >
-                    <Text style={[styles.statusBadgeText, { color: statusColor(row.status) }]}>
-                      {STATUS_LABEL[row.status] ?? row.status}
-                    </Text>
-                  </View>
-                  {row.verified && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color={COLOR.successStart}
-                      style={{ marginTop: 4 }}
-                    />
-                  )}
-                </View>
-              </View>
-            ))
-          )}
-        </GlassCard>
+        {/* 6. Detailed breakdowns live on the "Data for Nerds" page */}
+        <Pressable
+          onPress={() => router.push('/data-for-nerds' as any)}
+          style={({ pressed }) => [styles.nerdCard, styles.linkSpacing, pressed && styles.nerdCardPressed]}
+        >
+          <View style={styles.nerdIconWrap}>
+            <Ionicons name="analytics" size={20} color={COLOR.nuclearStart} />
+          </View>
+          <View style={styles.nerdTextWrap}>
+            <Text style={styles.nerdTitle}>Data for Nerds</Text>
+            <Text style={styles.nerdSub}>
+              Full breakdown by tier & category, plus the Tier 1 broker list
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLOR.textMuted} />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const StatPill = ({
-  label,
-  value,
-  color = COLOR.textMuted,
-}: {
-  label: string;
-  value: number;
-  color?: string;
-}) => (
-  <View style={styles.statPill}>
-    <Text style={[styles.statPillValue, { color }]}>{value}</Text>
-    <Text style={styles.statPillLabel}>{label}</Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLOR.deepVoid },
@@ -328,20 +262,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
-  glassCard: {
-    backgroundColor: COLOR.glassBg,
-    borderColor: COLOR.glassBorder,
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontFamily: 'Outfit_600SemiBold',
-    fontSize: 16,
-    color: COLOR.white,
-    marginBottom: 16,
-  },
   progressBlock: { marginBottom: 16 },
   progressLabelRow: {
     flexDirection: 'row',
@@ -376,60 +296,32 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  breakdownBlock: {
-    paddingBottom: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLOR.hairline,
-  },
-  breakdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  breakdownTier: { fontFamily: 'Outfit_600SemiBold', fontSize: 14, color: COLOR.white },
-  breakdownTotal: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted },
-  statPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  statPill: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    minWidth: 64,
-  },
-  statPillValue: { fontFamily: 'Outfit_600SemiBold', fontSize: 15 },
-  statPillLabel: { fontFamily: 'Inter_400Regular', fontSize: 10, color: COLOR.textMuted },
-  categoryRow: {
+  nerdCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLOR.hairline,
-  },
-  categoryInfo: { flex: 1, paddingRight: 12 },
-  categoryName: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: COLOR.white },
-  categoryMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted, marginTop: 2 },
-  categoryPct: { fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: COLOR.successStart },
-  brokerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLOR.hairline,
-  },
-  brokerInfo: { flex: 1, paddingRight: 12 },
-  brokerName: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: COLOR.white },
-  brokerMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted, marginTop: 2 },
-  brokerStatusWrap: { alignItems: 'flex-end' },
-  statusBadge: {
+    backgroundColor: COLOR.glassBg,
+    borderColor: COLOR.glassBorder,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 20,
+    padding: 16,
   },
-  statusBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
-  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: COLOR.textMuted },
+  nerdCardPressed: { opacity: 0.7 },
+  linkSpacing: { marginBottom: 12 },
+  nerdIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,212,255,0.1)',
+    marginRight: 12,
+  },
+  nerdTextWrap: { flex: 1 },
+  nerdTitle: { fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: COLOR.white },
+  nerdSub: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: COLOR.textMuted,
+    marginTop: 2,
+  },
 });
