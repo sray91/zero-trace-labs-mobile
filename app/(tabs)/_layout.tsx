@@ -3,9 +3,12 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { COLOR } from '@/lib/theme/colors';
 
 export default function TabLayout() {
+  usePushNotifications();
+
   return (
     <Tabs
       screenOptions={{

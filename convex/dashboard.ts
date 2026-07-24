@@ -2,16 +2,37 @@ import { query } from "./_generated/server";
 import { getCurrentUser } from "./users";
 import { Doc } from "./_generated/dataModel";
 
-// Removal-status buckets the dashboard reports on (mirrors the spreadsheet's
-// "Status Breakdown by Tier" columns). Anything unrecognized counts as not_started.
-const NOT_STARTED = "not_started";
+// How far each removalStatus sits in the Search → Find → Submit → Verify funnel
+// (0–4). Mirrors STATUS_META on the admin user page. Anything unrecognized = 0.
+const STATUS_REACHED: Record<string, number> = {
+  not_started: 0,
+  searched_not_found: 1,
+  searched_found: 2,
+  submitted: 3,
+  removed: 4,
+  reappeared: 2,
+  handled_by_service: 4,
+  skipped: 0,
+};
 
-function statusOf(exposure: Doc<"brokerExposures"> | undefined): string {
-  return exposure?.removalStatus ?? NOT_STARTED;
+// The funnel stage (0–4) a broker has reached for this user. Derived from *every*
+// signal, not removalStatus alone — recording a search sets searchedAt/exposureStatus
+// but leaves removalStatus 'not_started', so a status-only reading under-counts
+// "Searched". Each higher stage implies the lower ones, so the funnel stays monotonic.
+function stageReached(e: Doc<"brokerExposures"> | undefined): number {
+  if (!e) return 0;
+  let r = STATUS_REACHED[e.removalStatus ?? "not_started"] ?? 0;
+  if (e.verifiedRemoved || e.removedAt) r = Math.max(r, 4);
+  if (e.submittedAt) r = Math.max(r, 3);
+  if (e.exposureStatus === "found" || e.foundAt) r = Math.max(r, 2);
+  if (e.searchedAt || (e.exposureStatus && e.exposureStatus !== "unchecked"))
+    r = Math.max(r, 1);
+  return r;
 }
 
 // Read-only progress dashboard for the signed-in user (the "📊 Dashboard" tab).
-// Joins the broker catalog with the user's per-broker removal state.
+// Joins the broker catalog with the user's per-broker removal state and reports it
+// as a cumulative Search → Verify funnel.
 export const forCurrentUser = query({
   args: {},
   handler: async (ctx) => {
@@ -24,6 +45,9 @@ export const forCurrentUser = query({
 
     const exposuresBySource = new Map<string, Doc<"brokerExposures">>();
     let lastUpdated: number | undefined;
+    const bump = (t?: number) => {
+      if (t && (lastUpdated === undefined || t > lastUpdated)) lastUpdated = t;
+    };
     if (user) {
       const exposures = await ctx.db
         .query("brokerExposures")
@@ -31,29 +55,32 @@ export const forCurrentUser = query({
         .collect();
       for (const e of exposures) {
         exposuresBySource.set(e.dataSourceId, e);
-        const t = e._creationTime;
-        if (lastUpdated === undefined || t > lastUpdated) lastUpdated = t;
+        bump(e._creationTime);
+        bump(e.searchedAt);
+        bump(e.submittedAt);
+        bump(e.removedAt);
       }
     }
 
     const total = brokers.length;
     const tierCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
 
-    // tier -> status -> count
-    const tierStatus: Record<number, Record<string, number>> = {
-      1: {},
-      2: {},
-      3: {},
+    // tier -> cumulative funnel { searched, found, submitted, removed }
+    const tierFunnel: Record<number, { searched: number; found: number; submitted: number; removed: number }> = {
+      1: { searched: 0, found: 0, submitted: 0, removed: 0 },
+      2: { searched: 0, found: 0, submitted: 0, removed: 0 },
+      3: { searched: 0, found: 0, submitted: 0, removed: 0 },
     };
     // category -> { count, removed }
     const categoryAgg = new Map<string, { count: number; removed: number }>();
-    const statusCounts: Record<string, number> = {};
+    const funnel = { total, searched: 0, found: 0, submitted: 0, removed: 0 };
     const tier1: Array<{
       name: string;
       optOutUrl?: string;
       difficulty?: string;
       estProcessingDays?: number;
       status: string;
+      stage: number;
       submittedAt?: number;
       verified: boolean;
     }> = [];
@@ -62,16 +89,19 @@ export const forCurrentUser = query({
       const tier = broker.tier ?? 3;
       const category = broker.category ?? "Uncategorized";
       const exposure = exposuresBySource.get(broker._id);
-      const status = statusOf(exposure);
+      const stage = stageReached(exposure);
+      const status = exposure?.removalStatus ?? "not_started";
 
       tierCounts[tier] = (tierCounts[tier] ?? 0) + 1;
-      tierStatus[tier] = tierStatus[tier] ?? {};
-      tierStatus[tier][status] = (tierStatus[tier][status] ?? 0) + 1;
-      statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+      const tf = tierFunnel[tier] ?? (tierFunnel[tier] = { searched: 0, found: 0, submitted: 0, removed: 0 });
+      if (stage >= 1) { funnel.searched++; tf.searched++; }
+      if (stage >= 2) { funnel.found++; tf.found++; }
+      if (stage >= 3) { funnel.submitted++; tf.submitted++; }
+      if (stage >= 4) { funnel.removed++; tf.removed++; }
 
       const cat = categoryAgg.get(category) ?? { count: 0, removed: 0 };
       cat.count += 1;
-      if (status === "removed") cat.removed += 1;
+      if (stage >= 4) cat.removed += 1;
       categoryAgg.set(category, cat);
 
       if (tier === 1) {
@@ -81,27 +111,27 @@ export const forCurrentUser = query({
           difficulty: broker.difficulty,
           estProcessingDays: broker.estProcessingDays,
           status,
+          stage,
           submittedAt: exposure?.submittedAt,
-          verified: status === "removed",
+          verified: stage >= 4,
         });
       }
     }
 
-    const removed = statusCounts["removed"] ?? 0;
-    const submitted = statusCounts["submitted"] ?? 0;
-    const notStarted = statusCounts[NOT_STARTED] ?? 0;
+    const notStarted = total - funnel.searched;
     const pct = (n: number) => (total === 0 ? 0 : Math.round((n / total) * 1000) / 10);
 
     const byTier = [1, 2, 3].map((tier) => {
-      const s = tierStatus[tier] ?? {};
+      const tf = tierFunnel[tier] ?? { searched: 0, found: 0, submitted: 0, removed: 0 };
+      const t = tierCounts[tier] ?? 0;
       return {
         tier,
-        total: tierCounts[tier] ?? 0,
-        notStarted: s[NOT_STARTED] ?? 0,
-        searchedFound: s["searched_found"] ?? 0,
-        submitted: s["submitted"] ?? 0,
-        removed: s["removed"] ?? 0,
-        handledByService: s["handled_by_service"] ?? 0,
+        total: t,
+        notStarted: t - tf.searched,
+        searched: tf.searched,
+        found: tf.found,
+        submitted: tf.submitted,
+        removed: tf.removed,
       };
     });
 
@@ -119,17 +149,19 @@ export const forCurrentUser = query({
     return {
       total,
       tierCounts,
-      statusCounts,
+      funnel,
       summary: {
-        removed,
-        submitted,
         notStarted,
-        handledByService: statusCounts["handled_by_service"] ?? 0,
-        searchedFound: statusCounts["searched_found"] ?? 0,
+        searched: funnel.searched,
+        found: funnel.found,
+        submitted: funnel.submitted,
+        // submitted opt-outs still awaiting confirmation (stage exactly 3)
+        submittedAwaiting: funnel.submitted - funnel.removed,
+        removed: funnel.removed,
       },
       completion: {
-        removedPct: pct(removed),
-        submittedPct: pct(submitted),
+        removedPct: pct(funnel.removed),
+        submittedPct: pct(funnel.submitted),
         notStartedPct: pct(notStarted),
       },
       byTier,

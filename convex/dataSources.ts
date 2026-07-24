@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./users";
 import { BROKER_SEED, riskForTier } from "./brokerSeed";
 
 export const list = query({
@@ -12,26 +13,83 @@ export const list = query({
   },
 });
 
-export const add = mutation({
-  args: {
-    name: v.string(),
-    url: v.string(),
-    apiEndpoint: v.optional(v.string()),
-    riskLevel: v.string(),
-    description: v.optional(v.string()),
-    dataTypes: v.optional(v.array(v.string())),
-    isActive: v.optional(v.boolean()),
-  },
+// Editable catalog fields, shared by create + update. Tier drives riskLevel.
+const catalogFields = {
+  name: v.string(),
+  category: v.optional(v.string()),
+  tier: v.optional(v.number()), // 1 = Crucial, 2 = High, 3 = Standard
+  searchUrl: v.optional(v.string()),
+  optOutUrl: v.optional(v.string()),
+  optOutMethod: v.optional(v.string()),
+  difficulty: v.optional(v.string()), // Easy | Medium | Hard
+  estProcessingDays: v.optional(v.number()),
+  alsoCovers: v.optional(v.string()),
+  parentCompany: v.optional(v.string()),
+  instructions: v.optional(v.string()),
+};
+
+// Add a broker to the catalog. Admin only.
+export const create = mutation({
+  args: catalogFields,
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const tier = args.tier ?? 3;
     return await ctx.db.insert("dataSources", {
-      name: args.name,
-      url: args.url,
-      apiEndpoint: args.apiEndpoint,
-      riskLevel: args.riskLevel,
-      description: args.description,
-      dataTypes: args.dataTypes ?? [],
-      isActive: args.isActive ?? true,
+      ...args,
+      tier,
+      url: args.searchUrl ?? args.optOutUrl ?? "",
+      riskLevel: riskForTier(tier),
+      dataTypes: [],
+      isActive: true,
     });
+  },
+});
+
+// Edit an existing broker. Admin only.
+export const update = mutation({
+  args: { id: v.id("dataSources"), ...catalogFields },
+  handler: async (ctx, { id, ...fields }) => {
+    await requireAdmin(ctx);
+    const tier = fields.tier ?? 3;
+    await ctx.db.patch(id, {
+      ...fields,
+      tier,
+      url: fields.searchUrl ?? fields.optOutUrl ?? "",
+      riskLevel: riskForTier(tier),
+    });
+    return id;
+  },
+});
+
+// Inline edit of just the search / opt-out URLs, used from the per-user broker panel
+// so admins can correct a bad link without leaving the page. Narrow on purpose: unlike
+// `update` it touches only the two URL fields (+ derived legacy `url`), leaving tier,
+// category, difficulty, etc. untouched. Admin only.
+export const setUrls = mutation({
+  args: {
+    id: v.id("dataSources"),
+    searchUrl: v.optional(v.string()),
+    optOutUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, searchUrl, optOutUrl }) => {
+    await requireAdmin(ctx);
+    await ctx.db.patch(id, {
+      searchUrl,
+      optOutUrl,
+      url: searchUrl ?? optOutUrl ?? "",
+    });
+    return id;
+  },
+});
+
+// Remove a broker from the catalog. Soft-delete (isActive: false) to preserve
+// referential integrity with per-user brokerExposures rows. Admin only.
+export const remove = mutation({
+  args: { id: v.id("dataSources") },
+  handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
+    await ctx.db.patch(id, { isActive: false });
+    return id;
   },
 });
 

@@ -114,6 +114,7 @@ export default defineSchema({
     searchTerm: v.optional(v.string()), // Search Term Used
     whatWasFound: v.optional(v.string()), // What Was Found
     screenshotTaken: v.optional(v.boolean()), // Screenshot Taken?
+    screenshotId: v.optional(v.id("_storage")), // uploaded screenshot evidence
     actionTaken: v.optional(v.string()), // Action Taken
     followUpNeeded: v.optional(v.boolean()), // Follow-Up Needed?
   })
@@ -154,6 +155,18 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"]),
 
+  // Expo push tokens, one row per mobile device. Registered by the mobile app on
+  // sign-in; consumed by convex/pushNotifications.ts. Tokens that Expo reports as
+  // DeviceNotRegistered are pruned automatically.
+  pushTokens: defineTable({
+    userId: v.id("users"),
+    token: v.string(), // ExponentPushToken[...]
+    platform: v.optional(v.string()), // ios | android
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"]),
+
   // Inbound mail received at a user's proxyEmail. Written by the /inbound-email HTTP
   // endpoint (fed by Cloudflare Email Routing). Receive-only: the admin reads these
   // in the user detail page and clicks the broker verification links. No outbound.
@@ -173,4 +186,26 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_proxy_email", ["proxyEmail"]),
+
+  // In-app support chat. One active conversation per user; each conversation is
+  // mirrored into a Slack thread (SLACK_SUPPORT_CHANNEL) so the team can read and
+  // reply from Slack. Replies flow back via the /slack-events HTTP endpoint.
+  supportConversations: defineTable({
+    userId: v.id("users"),
+    status: v.string(), // bot | human | closed
+    // Slack thread that mirrors this conversation (set on first outbound post).
+    slackChannelId: v.optional(v.string()),
+    slackThreadTs: v.optional(v.string()),
+    lastMessageAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_slack_thread", ["slackThreadTs"]),
+
+  supportMessages: defineTable({
+    conversationId: v.id("supportConversations"),
+    role: v.string(), // user | bot | agent | system
+    text: v.string(),
+    authorName: v.optional(v.string()), // display name for agent replies from Slack
+    sentAt: v.number(),
+  }).index("by_conversation", ["conversationId"]),
 });
