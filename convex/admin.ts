@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { requireAdmin } from "./users";
 import { Doc, Id } from "./_generated/dataModel";
 
@@ -98,15 +99,26 @@ export const getUserDetail = query({
     const exposureBySource = new Map<string, Doc<"brokerExposures">>();
     for (const e of exposures) exposureBySource.set(e.dataSourceId, e);
 
-    const records = brokers
-      .map((broker) => ({
-        broker,
-        exposure: exposureBySource.get(broker._id) ?? null,
-      }))
-      .sort((a, b) => {
-        const t = (a.broker.tier ?? 3) - (b.broker.tier ?? 3);
-        return t !== 0 ? t : a.broker.name.localeCompare(b.broker.name);
-      });
+    const records = await Promise.all(
+      brokers.map(async (broker) => {
+        const exposure = exposureBySource.get(broker._id) ?? null;
+        return {
+          broker,
+          exposure: exposure
+            ? {
+                ...exposure,
+                screenshotUrl: exposure.screenshotId
+                  ? await ctx.storage.getUrl(exposure.screenshotId)
+                  : null,
+              }
+            : null,
+        };
+      })
+    );
+    records.sort((a, b) => {
+      const t = (a.broker.tier ?? 3) - (b.broker.tier ?? 3);
+      return t !== 0 ? t : a.broker.name.localeCompare(b.broker.name);
+    });
 
     const tasks = await ctx.db
       .query("userTasks")
@@ -141,12 +153,15 @@ export const setExposure = mutation({
     searchTerm: v.optional(v.string()),
     whatWasFound: v.optional(v.string()),
     screenshotTaken: v.optional(v.boolean()),
+    // null clears the stored screenshot (undefined args are dropped by Convex,
+    // so we use an explicit null to signal removal); an id deletes the old file.
+    screenshotId: v.optional(v.union(v.id("_storage"), v.null())),
     actionTaken: v.optional(v.string()),
     followUpNeeded: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const { userId, dataSourceId, ...patch } = args;
+    const { userId, dataSourceId, screenshotId, ...patch } = args;
 
     const existing = await ctx.db
       .query("brokerExposures")
@@ -155,8 +170,33 @@ export const setExposure = mutation({
       )
       .unique();
 
+    // Push-notify the user when the admin submits a removal on their behalf
+    // (transition into "submitted"; re-saves while already submitted stay quiet).
+    if (
+      patch.removalStatus === "submitted" &&
+      existing?.removalStatus !== "submitted"
+    ) {
+      const source = await ctx.db.get(dataSourceId);
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+        userId,
+        title: "Removal submitted",
+        body: `We submitted your opt-out request to ${source?.name ?? "a data broker"}.`,
+        data: { screen: "dashboard" },
+      });
+    }
+
+    // Screenshot change (id = set/replace, null = clear). undefined means the
+    // caller didn't touch it. Delete any file we're replacing or removing.
+    const screenshotPatch: { screenshotId?: Id<"_storage"> } = {};
+    if (screenshotId !== undefined) {
+      const next = screenshotId === null ? undefined : screenshotId;
+      const prev = existing?.screenshotId;
+      if (prev && prev !== next) await ctx.storage.delete(prev);
+      screenshotPatch.screenshotId = next;
+    }
+
     if (existing) {
-      await ctx.db.patch(existing._id, patch);
+      await ctx.db.patch(existing._id, { ...patch, ...screenshotPatch });
       return existing._id;
     }
 
@@ -177,9 +217,20 @@ export const setExposure = mutation({
       searchTerm: patch.searchTerm,
       whatWasFound: patch.whatWasFound,
       screenshotTaken: patch.screenshotTaken,
+      screenshotId: screenshotPatch.screenshotId,
       actionTaken: patch.actionTaken,
       followUpNeeded: patch.followUpNeeded,
     });
+  },
+});
+
+// Short-lived signed URL the admin posts the screenshot file to. The POST
+// returns a storageId that gets saved on the exposure via setExposure.
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await ctx.storage.generateUploadUrl();
   },
 });
 

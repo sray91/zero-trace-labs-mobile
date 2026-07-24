@@ -170,4 +170,107 @@ http.route({
   }),
 });
 
+// ---- Slack Events webhook: inbound half of the support-chat bridge ----
+// Point the Slack app's Event Subscriptions request URL at
+// https://<deployment>.convex.site/slack-events and subscribe to message.channels
+// (plus message.groups for private channels). Team replies inside a support thread
+// are written back to the conversation as agent messages.
+
+// HMAC-SHA256 per https://api.slack.com/authentication/verifying-requests-from-slack
+async function verifySlackSignature(
+  secret: string,
+  timestamp: string,
+  body: string,
+  signature: string
+): Promise<boolean> {
+  // Reject stale requests (replay protection).
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp));
+  if (!Number.isFinite(age) || age > 60 * 5) return false;
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const mac = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(`v0:${timestamp}:${body}`)
+  );
+  const expected =
+    "v0=" +
+    Array.from(new Uint8Array(mac))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+  // Constant-time comparison.
+  if (expected.length !== signature.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+http.route({
+  path: "/slack-events",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const secret = process.env.SLACK_SIGNING_SECRET;
+    if (!secret) {
+      return new Response("Missing SLACK_SIGNING_SECRET", { status: 500 });
+    }
+
+    const body = await request.text();
+    const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
+    const signature = request.headers.get("x-slack-signature") ?? "";
+    if (!(await verifySlackSignature(secret, timestamp, body, signature))) {
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    // One-time URL verification handshake when configuring the Slack app.
+    if (payload.type === "url_verification") {
+      return new Response(JSON.stringify({ challenge: payload.challenge }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (payload.type === "event_callback") {
+      const event = payload.event;
+      // Only plain human messages posted inside a thread. Skips our own bot's
+      // mirrored posts (bot_id) and edits/joins/etc. (subtype).
+      if (
+        event?.type === "message" &&
+        !event.bot_id &&
+        !event.subtype &&
+        typeof event.thread_ts === "string" &&
+        event.thread_ts !== event.ts &&
+        typeof event.text === "string" &&
+        event.text.trim()
+      ) {
+        // Ack Slack immediately; name lookup + write happen in the background.
+        await ctx.scheduler.runAfter(0, internal.slack.handleInboundMessage, {
+          slackThreadTs: event.thread_ts,
+          text: event.text.trim(),
+          slackUserId:
+            typeof event.user === "string" ? event.user : undefined,
+        });
+      }
+    }
+
+    return new Response(null, { status: 200 });
+  }),
+});
+
 export default http;

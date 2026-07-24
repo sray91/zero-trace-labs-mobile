@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getCurrentUser, requireCurrentUser } from "./users";
 
 export const listForUser = query({
@@ -36,7 +37,7 @@ export const add = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
-    return await ctx.db.insert("removalRequests", {
+    const id = await ctx.db.insert("removalRequests", {
       userId: user._id,
       dataSourceId: args.dataSourceId,
       fullName: args.fullName,
@@ -45,6 +46,20 @@ export const add = mutation({
       status: args.status ?? "pending",
       notes: args.notes,
     });
+
+    const source = args.dataSourceId
+      ? await ctx.db.get(args.dataSourceId)
+      : null;
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+      userId: user._id,
+      title: "Removal request submitted",
+      body: source
+        ? `Your removal request for ${source.name} is in. We'll notify you as it progresses.`
+        : "Your removal request is in. We'll notify you as it progresses.",
+      data: { screen: "dashboard" },
+    });
+
+    return id;
   },
 });
 

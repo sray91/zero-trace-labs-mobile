@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getCurrentUser, requireCurrentUser } from "./users";
 
 export const listForUser = query({
@@ -46,6 +47,20 @@ export const upsert = mutation({
         q.eq("userId", user._id).eq("dataSourceId", dataSourceId)
       )
       .unique();
+
+    // Push-notify on the transition into "submitted" (mirrors admin.setExposure).
+    if (
+      patch.removalStatus === "submitted" &&
+      existing?.removalStatus !== "submitted"
+    ) {
+      const source = await ctx.db.get(dataSourceId);
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+        userId: user._id,
+        title: "Removal submitted",
+        body: `Your opt-out request to ${source?.name ?? "a data broker"} was submitted.`,
+        data: { screen: "dashboard" },
+      });
+    }
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
