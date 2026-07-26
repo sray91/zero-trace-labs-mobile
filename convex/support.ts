@@ -210,5 +210,14 @@ export const receiveSlackReply = internalMutation({
       status: "human",
       lastMessageAt: Date.now(),
     });
+
+    // Human replies can arrive long after the user left the chat, so push.
+    // (Bot replies land in seconds while the user is watching — no push there.)
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+      userId: conversation.userId,
+      title: authorName ? `${authorName} (0TraceLabs Support)` : "Support replied",
+      body: text.length > 140 ? `${text.slice(0, 137)}...` : text,
+      data: { screen: "support-chat" },
+    });
   },
 });

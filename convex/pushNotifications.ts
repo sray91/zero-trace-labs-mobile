@@ -123,6 +123,79 @@ export const weeklyStatsForUser = internalQuery({
   },
 });
 
+// ---- Removal milestone detection ----
+
+// The ops workflow records progress inconsistently: sometimes removalStatus is
+// set ("submitted"/"removed"), sometimes only the timestamp columns are stamped
+// (submittedAt/removedAt/verifiedRemoved) while the status stays where it was.
+// Treat any of those signals as reaching the milestone, mirroring the derived
+// status shown in the admin Master Tracker.
+type ExposureSnapshot = {
+  removalStatus?: string;
+  submittedAt?: number;
+  removedAt?: number;
+  verifiedRemoved?: boolean;
+} | null;
+
+function reachedSubmitted(e: ExposureSnapshot) {
+  return !!e && (e.removalStatus === "submitted" || e.submittedAt != null);
+}
+
+function reachedRemoved(e: ExposureSnapshot) {
+  return (
+    !!e &&
+    (e.removalStatus === "removed" ||
+      e.removalStatus === "handled_by_service" ||
+      e.removedAt != null ||
+      e.verifiedRemoved === true)
+  );
+}
+
+/**
+ * Compares an exposure row before/after a patch and schedules a push for the
+ * highest milestone newly reached (removed beats submitted, so a straight
+ * jump to "removed" sends one push, not two). Shared by brokerExposures.upsert
+ * and admin.setExposure. `patch` may contain undefined values for untouched
+ * fields — they must not clobber the existing row when merged.
+ */
+export async function notifyRemovalMilestone(
+  ctx: {
+    db: { get: (id: Id<"dataSources">) => Promise<{ name: string } | null> };
+    scheduler: {
+      runAfter: (delay: number, ref: any, args: any) => Promise<any>;
+    };
+  },
+  userId: Id<"users">,
+  dataSourceId: Id<"dataSources">,
+  existing: ExposureSnapshot,
+  patch: Record<string, unknown>
+) {
+  const defined = Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined)
+  );
+  const next = { ...(existing ?? {}), ...defined } as ExposureSnapshot;
+
+  let title: string | undefined;
+  let body: string | undefined;
+  if (reachedRemoved(next) && !reachedRemoved(existing)) {
+    const source = await ctx.db.get(dataSourceId);
+    title = "Removal confirmed";
+    body = `Your info was removed from ${source?.name ?? "a data broker"}.`;
+  } else if (reachedSubmitted(next) && !reachedSubmitted(existing)) {
+    const source = await ctx.db.get(dataSourceId);
+    title = "Removal submitted";
+    body = `Your opt-out request to ${source?.name ?? "a data broker"} was submitted.`;
+  }
+  if (!title || !body) return;
+
+  await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+    userId,
+    title,
+    body,
+    data: { screen: "dashboard" },
+  });
+}
+
 // ---- Sending ----
 
 type ExpoPushTicket = {
