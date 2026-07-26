@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotracelabs.app",
-      "buildNumber": "48",
+      "buildNumber": "50",
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",
