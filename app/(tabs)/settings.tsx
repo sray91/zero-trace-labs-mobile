@@ -97,6 +97,23 @@ export default function SettingsScreen() {
           </View>
         </GlassCard>
 
+        {/* Support chat */}
+        <Pressable onPress={() => router.push('/support-chat' as any)}>
+          <GlassCard style={styles.supportCard}>
+            <View style={styles.infoRow}>
+              <Ionicons name="chatbubbles" size={22} color={COLOR.nuclearStart} />
+              <View style={styles.infoCopy}>
+                <Text style={styles.infoTitle}>Chat with Support</Text>
+                <Text style={styles.infoBody}>
+                  Ask us anything about 0TraceLabs — our assistant answers instantly, or talk
+                  to a human.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLOR.textMuted} />
+            </View>
+          </GlassCard>
+        </Pressable>
+
         <Pressable style={styles.dangerButton} onPress={handleLogout}>
           <Text style={styles.dangerButtonText}>SIGN OUT</Text>
         </Pressable>
@@ -163,7 +180,8 @@ const styles = StyleSheet.create({
     color: COLOR.textMuted,
     textAlign: 'center',
   },
-  infoCard: { marginBottom: 24 },
+  infoCard: { marginBottom: 16 },
+  supportCard: { marginBottom: 24 },
   infoRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   infoCopy: { flex: 1 },
   infoTitle: {
