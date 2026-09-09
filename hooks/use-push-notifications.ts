@@ -7,6 +7,13 @@ import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
+// expo-notifications' response APIs don't exist on web; stub the hook there so
+// the shared tree still renders in a browser.
+const useLastNotificationResponse =
+  Platform.OS === 'web'
+    ? () => null
+    : Notifications.useLastNotificationResponse;
+
 // How foreground notifications are presented while the app is open.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -34,7 +41,7 @@ export function usePushNotifications() {
 
   // useLastNotificationResponse also covers cold starts, where a listener
   // registered after launch would miss the tap that opened the app.
-  const response = Notifications.useLastNotificationResponse();
+  const response = useLastNotificationResponse();
   const handledResponse = useRef<string | null>(null);
 
   useEffect(() => {

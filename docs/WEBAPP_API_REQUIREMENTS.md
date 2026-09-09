@@ -1,3 +1,6 @@
+> ⚠️ **OUTDATED — DO NOT FOLLOW.** This describes the old Superwall + Whop + Supabase
+> stack, replaced by RevenueCat + Convex + Clerk. See `docs/SUBSCRIPTIONS_SETUP.md`.
+
 # Webapp API Requirements for Mobile Checkout
 
 Your mobile app needs a simple API endpoint on your webapp to create Whop checkout sessions.

@@ -15,12 +15,8 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotracelabs.app",
-      "buildNumber": "50",
+      "buildNumber": "59",
       "supportsTablet": true,
-      "infoPlist": {
-        "NSFaceIDUsageDescription": "We use Face ID to securely authenticate your account.",
-        "NSCameraUsageDescription": "Camera access is needed to scan QR codes for enhanced security features."
-      },
       "config": {
         "usesNonExemptEncryption": false
       }

@@ -1,5 +1,5 @@
 import { query } from "./_generated/server";
-import { getCurrentUser } from "./users";
+import { getPaidUser } from "./subscriptions";
 import { Doc } from "./_generated/dataModel";
 
 // How far each removalStatus sits in the Search → Find → Submit → Verify funnel
@@ -36,7 +36,9 @@ function stageReached(e: Doc<"brokerExposures"> | undefined): number {
 export const forCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
+    // Unpaid callers fall through the `if (user)` branch below and get the public
+    // broker catalog with a zeroed funnel — no personal exposure data, no error.
+    const user = await getPaidUser(ctx);
 
     const brokers = await ctx.db
       .query("dataSources")

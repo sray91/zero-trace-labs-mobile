@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, ViewProps } from 'react-native';
-import { Image } from 'expo-image';
+import { StyleProp, View, ViewProps } from 'react-native';
+import { Image, ImageStyle } from 'expo-image';
 import { cn } from '@/lib/utils/cn';
 
 export type LogoSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
-export interface LogoProps extends ViewProps {
+export interface LogoProps extends Omit<ViewProps, 'style'> {
+  /** Applied to the image itself, not the wrapper View. */
+  style?: StyleProp<ImageStyle>;
   size?: LogoSize;
   /**
    * Custom width and height in pixels

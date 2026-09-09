@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { notifyRemovalMilestone } from "./pushNotifications";
-import { getCurrentUser, requireCurrentUser } from "./users";
+import { getPaidUser, requirePaidUser } from "./subscriptions";
 
 export const listForUser = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
+    const user = await getPaidUser(ctx);
     if (!user) return [];
     return await ctx.db
       .query("brokerExposures")
@@ -38,7 +38,7 @@ export const upsert = mutation({
     followUpNeeded: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
+    const user = await requirePaidUser(ctx);
     const { dataSourceId, ...patch } = args;
 
     const existing = await ctx.db

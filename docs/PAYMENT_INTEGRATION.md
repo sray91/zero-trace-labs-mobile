@@ -1,3 +1,6 @@
+> ⚠️ **OUTDATED — DO NOT FOLLOW.** This describes the old Superwall + Whop + Supabase
+> stack, replaced by RevenueCat + Convex + Clerk. See `docs/SUBSCRIPTIONS_SETUP.md`.
+
 # Payment Integration Guide: Superwall + Whop + Supabase
 
 This document explains how the payment system works in the 0Trace Labs mobile app.

@@ -95,8 +95,19 @@ http.route({
   path: "/revenuecat-webhook",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
+    // Fail closed. This endpoint grants paid access to whatever `app_user_id` it is
+    // handed, so an unset secret must reject rather than wave everything through —
+    // the previous `if (expected && ...)` form silently disabled auth entirely.
     const expected = process.env.REVENUECAT_WEBHOOK_AUTH_HEADER;
-    if (expected && request.headers.get("Authorization") !== expected) {
+    if (!expected) {
+      console.error(
+        "REVENUECAT_WEBHOOK_AUTH_HEADER is not set — rejecting RevenueCat webhook. " +
+        "Set it in the Convex dashboard to the same value configured under " +
+        "RevenueCat → Integrations → Webhooks."
+      );
+      return new Response("Webhook not configured", { status: 503 });
+    }
+    if (request.headers.get("Authorization") !== expected) {
       return new Response("Unauthorized", { status: 401 });
     }
 
