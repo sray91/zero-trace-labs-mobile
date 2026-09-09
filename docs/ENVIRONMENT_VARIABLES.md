@@ -1,3 +1,6 @@
+> ⚠️ **OUTDATED — DO NOT FOLLOW.** This describes the old Superwall + Whop + Supabase
+> stack, replaced by RevenueCat + Convex + Clerk. See `docs/SUBSCRIPTIONS_SETUP.md`.
+
 # Environment Variables in Production
 
 ## Overview

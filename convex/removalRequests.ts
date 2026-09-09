@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { getCurrentUser, requireCurrentUser } from "./users";
+import { getPaidUser, requirePaidUser } from "./subscriptions";
 
 export const listForUser = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
+    const user = await getPaidUser(ctx);
     if (!user) return [];
     const rows = await ctx.db
       .query("removalRequests")
@@ -36,7 +36,7 @@ export const add = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
+    const user = await requirePaidUser(ctx);
     const id = await ctx.db.insert("removalRequests", {
       userId: user._id,
       dataSourceId: args.dataSourceId,
@@ -70,7 +70,7 @@ export const updateStatus = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
+    const user = await requirePaidUser(ctx);
     const row = await ctx.db.get(args.id);
     if (!row || row.userId !== user._id) throw new Error("Not found");
     await ctx.db.patch(args.id, {

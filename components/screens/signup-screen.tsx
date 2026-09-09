@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platfor
 import { router } from 'expo-router';
 import { useSignUp } from '@clerk/clerk-expo';
 import { Input, Button, Card, CardContent, Logo, Alert as UIAlert } from '@/components/ui';
+import { clerkErrorMessage } from '@/lib/clerk-errors';
 
 export function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -11,10 +12,11 @@ export function SignUpScreen() {
   const [error, setError] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { signUp, setActive, isLoaded } = useSignUp();
 
   const handleSignUp = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || submitting) return;
 
     setError('');
 
@@ -33,9 +35,10 @@ export function SignUpScreen() {
       return;
     }
 
+    setSubmitting(true);
     try {
       await signUp.create({
-        emailAddress: email,
+        emailAddress: email.trim(),
         password,
       });
 
@@ -44,18 +47,21 @@ export function SignUpScreen() {
 
       setPendingVerification(true);
     } catch (err: any) {
-      setError(err.errors?.[0]?.message || 'An error occurred during sign up');
+      setError(clerkErrorMessage(err, 'An error occurred during sign up. Please try again.'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleVerifyEmail = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || submitting) return;
 
     setError('');
 
+    setSubmitting(true);
     try {
       const result = await signUp.attemptEmailAddressVerification({
-        code,
+        code: code.trim(),
       });
 
       if (result.status === 'complete') {
@@ -65,7 +71,9 @@ export function SignUpScreen() {
         setError('Verification failed. Please try again.');
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.message || 'Verification failed');
+      setError(clerkErrorMessage(err, 'Verification failed. Please try again.'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -116,9 +124,9 @@ export function SignUpScreen() {
                   size="lg"
                   fullWidth
                   onPress={handleVerifyEmail}
-                  disabled={!isLoaded || !code}
+                  disabled={!isLoaded || !code || submitting}
                 >
-                  Verify Email
+                  {submitting ? 'Verifying...' : 'Verify Email'}
                 </Button>
               </View>
             </CardContent>
@@ -203,9 +211,9 @@ export function SignUpScreen() {
                 size="lg"
                 fullWidth
                 onPress={handleSignUp}
-                disabled={!isLoaded}
+                disabled={!isLoaded || submitting}
               >
-                {!isLoaded ? 'Loading...' : 'Create Account'}
+                {!isLoaded ? 'Loading...' : submitting ? 'Creating Account...' : 'Create Account'}
               </Button>
             </View>
           </CardContent>

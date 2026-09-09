@@ -1,14 +1,20 @@
 import { api } from '@/convex/_generated/api';
+import { revenueCatService } from '@/lib/revenue-cat';
 import { useClerkAuth } from '@/lib/stores/auth-store';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 import { COLOR } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
+  Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -17,6 +23,13 @@ import {
   View,
 } from 'react-native';
 
+/** Where the OS lets a user cancel or switch plans — Apple and Google both require
+ *  that a paid app link users here rather than handling cancellation in-app. */
+const MANAGE_SUBSCRIPTION_URL =
+  Platform.OS === 'ios'
+    ? 'https://apps.apple.com/account/subscriptions'
+    : 'https://play.google.com/store/account/subscriptions';
+
 const GlassCard = ({ children, style }: { children: React.ReactNode; style?: object }) => (
   <View style={[styles.glassCard, style]}>{children}</View>
 );
@@ -24,14 +37,74 @@ const GlassCard = ({ children, style }: { children: React.ReactNode; style?: obj
 export default function SettingsScreen() {
   const { signOut, user } = useClerkAuth();
   const profile = useQuery(api.users.getProfile);
+  const entitlement = useQuery(api.subscriptions.getEntitlement);
+  const isEntitled = useSubscriptionStore((s) => s.isEntitled);
+  const isRestoring = useSubscriptionStore((s) => s.isRestoring);
+  const restorePurchases = useSubscriptionStore((s) => s.restorePurchases);
 
   const email = user?.primaryEmailAddress?.emailAddress;
   const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ');
   const avatarChar = (fullName || email || 'U').charAt(0).toUpperCase();
 
+  const isPaid = entitlement?.isPaid === true || isEntitled;
+  const planLabel = entitlement?.isPaid ? entitlement.planLabel : isEntitled ? 'Premium' : 'Free';
+  const renewsOn = entitlement?.currentPeriodEnd
+    ? new Date(entitlement.currentPeriodEnd).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+
   const handleLogout = async () => {
     await signOut();
     router.replace('/auth/login' as any);
+  };
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account, profile, and removal history. Any active subscription must be cancelled separately in your App Store settings. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!user) return;
+            setIsDeleting(true);
+            try {
+              // Deleting the Clerk user fires the user.deleted webhook, which removes
+              // the Convex user + profile (convex/users.ts deleteFromClerk).
+              await user.delete();
+              await revenueCatService.logOut().catch(() => {});
+              router.replace('/auth/login' as any);
+            } catch (err: any) {
+              Alert.alert(
+                'Couldn’t delete account',
+                err?.errors?.[0]?.longMessage ??
+                  err?.message ??
+                  'Please try again or contact support.'
+              );
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestore = async () => {
+    const restored = await restorePurchases();
+    Alert.alert(
+      restored ? 'Purchases restored' : 'No purchases found',
+      restored
+        ? 'Your plan is active on this device.'
+        : 'We couldn’t find an active plan for this account. If you subscribed with a different Apple ID or Google account, sign in with that one and try again.'
+    );
   };
 
   return (
@@ -83,6 +156,50 @@ export default function SettingsScreen() {
           </View>
         </GlassCard>
 
+        {/* Subscription */}
+        <GlassCard style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Ionicons
+              name={isPaid ? 'shield-checkmark' : 'lock-closed'}
+              size={22}
+              color={isPaid ? COLOR.successStart : COLOR.warningEnd}
+            />
+            <View style={styles.infoCopy}>
+              <Text style={styles.infoTitle}>{planLabel}</Text>
+              <Text style={styles.infoBody}>
+                {isPaid
+                  ? renewsOn
+                    ? `Your plan renews on ${renewsOn}.`
+                    : 'Your plan is active.'
+                  : 'Subscribe for $14.99/month or $149.99/year to keep removals running.'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.planActions}>
+            {isPaid ? (
+              <Pressable
+                style={styles.planButton}
+                onPress={() => Linking.openURL(MANAGE_SUBSCRIPTION_URL)}
+              >
+                <Text style={styles.planButtonText}>Manage Subscription</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.planButton} onPress={() => router.push('/paywall')}>
+                <Text style={styles.planButtonText}>View Plans</Text>
+              </Pressable>
+            )}
+
+            <Pressable style={styles.planButton} onPress={handleRestore} disabled={isRestoring}>
+              {isRestoring ? (
+                <ActivityIndicator size="small" color={COLOR.nuclearStart} />
+              ) : (
+                <Text style={styles.planButtonText}>Restore Purchases</Text>
+              )}
+            </Pressable>
+          </View>
+        </GlassCard>
+
         {/* Removal service info — read-only model */}
         <GlassCard style={styles.infoCard}>
           <View style={styles.infoRow}>
@@ -116,6 +233,20 @@ export default function SettingsScreen() {
 
         <Pressable style={styles.dangerButton} onPress={handleLogout}>
           <Text style={styles.dangerButtonText}>SIGN OUT</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.deleteButton}
+          onPress={handleDeleteAccount}
+          disabled={isDeleting}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account"
+        >
+          {isDeleting ? (
+            <ActivityIndicator size="small" color={COLOR.danger} />
+          ) : (
+            <Text style={styles.deleteButtonText}>Delete account</Text>
+          )}
         </Pressable>
 
         <View style={styles.appInfo}>
@@ -191,6 +322,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   infoBody: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19, color: COLOR.textMuted },
+  planActions: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: COLOR.hairline,
+  },
+  planButton: { minHeight: 28, justifyContent: 'center' },
+  planButtonText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13,
+    color: COLOR.nuclearStart,
+  },
   dangerButton: {
     marginTop: 8,
     borderRadius: 999,
@@ -200,6 +345,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dangerButtonText: { fontFamily: 'Outfit_600SemiBold', color: COLOR.danger, letterSpacing: 1 },
+  deleteButton: { marginTop: 12, paddingVertical: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  deleteButtonText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: COLOR.textMuted,
+    textDecorationLine: 'underline',
+  },
   appInfo: { marginTop: 32, alignItems: 'center' },
   appInfoText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: COLOR.textMuted },
 });

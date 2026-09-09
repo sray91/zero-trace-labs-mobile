@@ -1,7 +1,9 @@
 import '@/global.css';
 import { ProtectedRoute } from '@/components/auth/protected-route';
+import { SubscriptionGate } from '@/components/auth/subscription-gate';
 import { WelcomeGate } from '@/components/auth/welcome-gate';
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { RevenueCatProvider } from '@/components/providers/revenue-cat-provider';
 import { convex, ConvexProviderWithClerk, useAuth } from '@/lib/convex';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
@@ -52,27 +54,32 @@ export default function RootLayout() {
     <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <AuthProvider>
-          <ProtectedRoute>
-            <WelcomeGate>
-              <StatusBar style="light" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: '#0C0E1A' },
-                }}
-              >
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="data-for-nerds" />
-                <Stack.Screen name="how-it-works" />
-                <Stack.Screen name="support-chat" />
-                <Stack.Screen name="welcome" />
-                <Stack.Screen name="onboarding-complete" />
-                <Stack.Screen name="auth/login" />
-                <Stack.Screen name="auth/signup" />
-                <Stack.Screen name="auth/forgot-password" />
-              </Stack>
-            </WelcomeGate>
-          </ProtectedRoute>
+          <RevenueCatProvider>
+            <ProtectedRoute>
+              <WelcomeGate>
+                <SubscriptionGate>
+                  <StatusBar style="light" />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: '#0C0E1A' },
+                    }}
+                  >
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="data-for-nerds" />
+                    <Stack.Screen name="how-it-works" />
+                    <Stack.Screen name="support-chat" />
+                    <Stack.Screen name="welcome" />
+                    <Stack.Screen name="onboarding-complete" />
+                    <Stack.Screen name="paywall" />
+                    <Stack.Screen name="auth/login" />
+                    <Stack.Screen name="auth/signup" />
+                    <Stack.Screen name="auth/forgot-password" />
+                  </Stack>
+                </SubscriptionGate>
+              </WelcomeGate>
+            </ProtectedRoute>
+          </RevenueCatProvider>
         </AuthProvider>
       </ConvexProviderWithClerk>
     </ClerkProvider>

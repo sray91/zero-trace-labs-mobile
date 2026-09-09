@@ -1,4 +1,5 @@
 import { api } from '@/convex/_generated/api';
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/lib/legal';
 import { COLOR } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
@@ -7,6 +8,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
+  Linking,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -353,6 +355,7 @@ export default function WelcomeScreen() {
                 label="ZIP code"
                 value={zipCode}
                 onChangeText={setZipCode}
+                required
                 placeholder="12345"
                 keyboardType="number-pad"
                 autoCapitalize="none"
@@ -382,12 +385,19 @@ export default function WelcomeScreen() {
 
               <View style={styles.consentGroup}>
                 <Checkbox checked={privacyConsent} onToggle={() => setPrivacyConsent((v) => !v)}>
-                  I have read and agree to the Privacy Policy, and understand how my data is used
-                  to remove my information from data brokers.
+                  I have read and agree to the{' '}
+                  <Text style={styles.checkLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                    Privacy Policy
+                  </Text>
+                  , and understand how my data is used to remove my information from data brokers.
                 </Checkbox>
                 <Checkbox checked={termsAccepted} onToggle={() => setTermsAccepted((v) => !v)}>
-                  I agree to the Terms of Service and acknowledge that 0Trace will act on my
-                  behalf to submit data removal requests.
+                  I agree to the{' '}
+                  <Text style={styles.checkLink} onPress={() => Linking.openURL(TERMS_OF_USE_URL)}>
+                    Terms of Service
+                  </Text>{' '}
+                  and acknowledge that 0Trace will act on my behalf to submit data removal
+                  requests.
                 </Checkbox>
               </View>
             </View>
@@ -613,6 +623,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: COLOR.white,
   },
+  checkLink: { color: COLOR.nuclearStart, textDecorationLine: 'underline' },
   successWrap: { alignItems: 'center', marginBottom: 16 },
   successRingOuter: {
     width: 88,
