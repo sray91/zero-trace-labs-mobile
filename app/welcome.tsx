@@ -144,11 +144,11 @@ export default function WelcomeScreen() {
         lastName,
         dateOfBirth: dateOfBirth || undefined,
         phoneNumber: phoneNumber || undefined,
-        addressLine1,
+        addressLine1: addressLine1 || undefined,
         addressLine2: addressLine2 || undefined,
-        city,
-        state: stateField,
-        zipCode,
+        city: city || undefined,
+        state: stateField || undefined,
+        zipCode: zipCode || undefined,
         welcomeStep: 2,
       });
       return true;
@@ -183,8 +183,8 @@ export default function WelcomeScreen() {
   const handleNext = async () => {
     setError('');
     if (step === 2) {
-      if (!firstName || !lastName || !addressLine1 || !city || !stateField || !zipCode) {
-        setError('Please fill in all required fields.');
+      if (!firstName.trim() || !lastName.trim()) {
+        setError('Please enter your first and last name.');
         return;
       }
       const saved = await savePersonalInfo();
@@ -322,12 +322,15 @@ export default function WelcomeScreen() {
                 keyboardType="phone-pad"
                 autoCapitalize="none"
               />
+              <Text style={styles.optionalNote}>
+                Address is optional. Adding it helps us match your listings more accurately, but
+                we can still search using your name alone.
+              </Text>
               <Field
                 label="Address line 1"
                 value={addressLine1}
                 onChangeText={setAddressLine1}
                 placeholder="123 Main St"
-                required
               />
               <Field
                 label="Address line 2"
@@ -337,7 +340,7 @@ export default function WelcomeScreen() {
               />
               <View style={styles.row}>
                 <View style={styles.twoThirds}>
-                  <Field label="City" value={city} onChangeText={setCity} required />
+                  <Field label="City" value={city} onChangeText={setCity} />
                 </View>
                 <View style={styles.third}>
                   <Field
@@ -347,7 +350,6 @@ export default function WelcomeScreen() {
                     placeholder="CA"
                     autoCapitalize="characters"
                     maxLength={2}
-                    required
                   />
                 </View>
               </View>
@@ -355,7 +357,6 @@ export default function WelcomeScreen() {
                 label="ZIP code"
                 value={zipCode}
                 onChangeText={setZipCode}
-                required
                 placeholder="12345"
                 keyboardType="number-pad"
                 autoCapitalize="none"
@@ -522,6 +523,13 @@ const styles = StyleSheet.create({
   twoThirds: { flex: 2 },
   third: { flex: 1 },
   field: { marginBottom: 16 },
+  optionalNote: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLOR.textMuted,
+    marginBottom: 12,
+  },
   fieldLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
