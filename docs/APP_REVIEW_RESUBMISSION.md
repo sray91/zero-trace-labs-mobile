@@ -116,3 +116,39 @@ Then reply in Resolution Center summarising: subscriptions attached, sign-up fix
   is on the non-current `ios-app-store` offering, which only sells the old Basic product).
   The SDK falls back to a default template. Attach a paywall to the `default` offering when
   convenient.
+
+---
+
+# Resubmission — submission 66c09b40 (build 59, rejected 2026-09-11)
+
+One issue: **Guideline 5.1.1(v)** — the app required Address / City / State / ZIP during
+onboarding. Apple considers these non-essential for the core service and requires them to
+be optional.
+
+## Already done (this repo)
+- `app/welcome.tsx`: Address line 1, City, State and ZIP no longer carry the required marker,
+  step 2 validates only first and last name, blank address fields are sent as `undefined`,
+  and a note above the address block says the address is optional but improves matching.
+- No backend change needed: `users.upsertProfile` and the schema already treat every address
+  field as optional, and `scanner.ts` searches by name alone when no address exists.
+
+## To do
+1. Commit and push the change.
+2. Build: `eas build --platform ios --profile production` (auto-increments to build 60).
+3. Verify on the EAS build or a simulator: sign up with a fresh account, on "Let's get started"
+   enter only first and last name, tap Next, confirm it advances with no error and the address
+   note is visible. Also confirm entering a full address still saves.
+4. Submit: `eas submit --platform ios --profile production`, then in App Store Connect attach
+   build 60 to version 1.0 (the version stays; only the build changes). Keep the two
+   subscriptions attached to the version if they are not yet approved.
+5. App Review Information → Notes: add the paragraph below.
+6. Reply in the Resolution Center thread for submission 66c09b40 with the same paragraph and
+   resubmit for review.
+
+## Reviewer note / Resolution Center reply
+> Thank you for the review. We have updated the onboarding flow so that address, city, state
+> and ZIP code are no longer required. Only first and last name are required, since our
+> service searches data-broker sites for the user's listings and needs a name to do so. The
+> address fields remain available as optional inputs (labelled as optional) because they
+> improve match accuracy, but the app proceeds and functions fully without them. This is in
+> build 60. All other functionality is unchanged from the previously reviewed build.
