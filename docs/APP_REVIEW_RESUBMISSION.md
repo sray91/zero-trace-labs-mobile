@@ -102,6 +102,8 @@ Gotchas learned while fixing it:
   functions are deployed from there. The `convex/` changes in this repo (fail-closed webhook,
   `ENFORCE_SUBSCRIPTIONS` gating) are **not** on prod. Deploying from this repo would replace
   the web app's functions — reconcile the two `convex/` folders before running `convex deploy`.
+  (**Stale as of 2026-09-18** — a function-level diff found the two folders in sync apart from
+  the AI consent gate and one migration. See the 2026-09-18 section at the end of this file.)
 
 ### 6. Build and submit
 ```bash
@@ -160,12 +162,13 @@ be optional.
 **Guidelines 5.1.1(i) and 5.1.2(i)** — the app shares personal data with a third-party AI
 service without disclosing what is sent, naming the recipient, or asking permission first.
 
-> **Build numbering.** The latest iOS build on EAS is **59** (finished 2026-09-08, from commit
-> `530d8d0a`, which is not in this repo or on origin). There is no build 60 on EAS, and the
-> 5.1.1(v) address fix (`71a16be`, 2026-09-15) has never been built here. `app.json` is at 59,
-> so `autoIncrement` makes the next production build **60**, carrying both the address fix and
-> the AI consent work. Confirm nothing was uploaded to App Store Connect outside EAS before
-> relying on 60 being free.
+> **Build 60** (`36e94eb7-55bd-49be-9a63-8be196f25d86`) was built on 2026-09-18 and carries both
+> this fix and the 5.1.1(v) address fix. Verified by unpacking the IPA: `CFBundleVersion` 60,
+> and the Hermes bundle contains the disclosure strings and `Address is optional…`.
+>
+> **Build 59 was the only build that existed before it**, so the address fix (`71a16be`,
+> 2026-09-15) had never shipped in a binary — whatever Apple reviewed on 2026-09-18 did not
+> contain it.
 
 Apple offers two paths; only the first applies. The app **does** send user data to an AI
 service: `convex/supportBot.ts` calls the Anthropic Claude API from the in-app Support chat.
@@ -216,14 +219,23 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 2. Confirm Anthropic's current Commercial Terms and your API retention settings still support
    the "not used to train models" line before sending the reply.
 3. Check the **App Store Connect privacy nutrition labels** still match what is collected.
-4. **Deploy the Convex functions to prod first.** The consent gate lives in `convex/`, and per
-   the notes above the prod deployment (`standing-swordfish-884`) is shared with the web app
-   repo and deployed from there. Until `support.aiConsent` / `support.setAiConsent` exist on
-   prod, the new Support chat screen calls functions that are not there. Reconcile the two
-   `convex/` folders and deploy from whichever repo owns prod — do not `convex deploy` from
-   here without checking, it would replace the web app's functions.
-5. Build and submit: `eas build --platform ios --profile production` (auto-increments to 60),
-   then `eas submit --platform ios --profile production`.
+4. **Deploy the Convex functions to prod first — this blocks submission.** With the old
+   functions deployed, a reviewer opening Support chat sees the disclosure, taps "Agree and
+   continue", and gets "Couldn't save your choice": the gate cannot be passed. That is a worse
+   rejection than the one being answered.
+
+   The two `convex/` folders are **not** badly diverged — that warning above is stale. Diffing
+   all 59 functions deployed on `standing-swordfish-884` against this repo on 2026-09-18:
+
+   | | |
+   |---|---|
+   | In this repo, not on prod | `support:aiConsent`, `support:setAiConsent` (the new gate) |
+   | On prod, not in this repo | `users:migrateProxyEmailDomains` — since ported here, but **reconstructed from its deployed signature, not copied from the web app repo**. Diff it against that repo before deploying from here. |
+
+   Prod is confirmed to be running the pre-change code: `support:forCurrentUser` returns bare
+   `null`, which is the old signature.
+5. Build: done — build 60, above. Submit with
+   `eas submit --platform ios --profile production` **after** step 4.
 6. Verify on the build: fresh account → Settings → Chat with Support → the disclosure appears
    before any message box; decline → chat opens in team mode and no assistant reply arrives;
    accept → assistant replies and the Claude/Anthropic notice is visible; Settings toggle off
