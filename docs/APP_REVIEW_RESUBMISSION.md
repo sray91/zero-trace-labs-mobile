@@ -162,13 +162,16 @@ be optional.
 **Guidelines 5.1.1(i) and 5.1.2(i)** — the app shares personal data with a third-party AI
 service without disclosing what is sent, naming the recipient, or asking permission first.
 
-> **Build 60** (`36e94eb7-55bd-49be-9a63-8be196f25d86`) was built on 2026-09-18 and carries both
-> this fix and the 5.1.1(v) address fix. Verified by unpacking the IPA: `CFBundleVersion` 60,
-> and the Hermes bundle contains the disclosure strings and `Address is optional…`.
+> **Build numbering — read this before building.** `app.json` is the source of truth
+> (`appVersionSource: local`) and past `autoIncrement` bumps have repeatedly been left
+> uncommitted, so it drifts *behind* what is on EAS. Check `eas build:list` before every build.
 >
-> **Build 59 was the only build that existed before it**, so the address fix (`71a16be`,
-> 2026-09-15) had never shipped in a binary — whatever Apple reviewed on 2026-09-18 did not
-> contain it.
+> | Build | Date | Commit | What it is |
+> |---|---|---|---|
+> | 59 | 2026-09-08 | tree of `4314782` | Rejected 2026-09-11 for 5.1.1(v) |
+> | 60 | 2026-09-15 | `71a16be` | Address fix. **Reviewed and rejected 2026-09-18 for 5.1.1(i)/5.1.2(i)** |
+> | 60 (dup) | 2026-09-18 | `4d2df29` | Built with a stale `app.json`; duplicate build number, cannot be uploaded |
+> | 61 | 2026-09-18 | `e1ada68` | The consent gate. This is the one to submit |
 
 Apple offers two paths; only the first applies. The app **does** send user data to an AI
 service: `convex/supportBot.ts` calls the Anthropic Claude API from the in-app Support chat.
@@ -234,8 +237,8 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 
    Prod is confirmed to be running the pre-change code: `support:forCurrentUser` returns bare
    `null`, which is the old signature.
-5. Build: done — build 60, above. Submit with
-   `eas submit --platform ios --profile production` **after** step 4.
+5. Build 61, then submit with `eas submit --platform ios --profile production --latest`
+   **after** step 4. Confirm `--latest` resolves to 61 and not the unusable duplicate 60.
 6. Verify on the build: fresh account → Settings → Chat with Support → the disclosure appears
    before any message box; decline → chat opens in team mode and no assistant reply arrives;
    accept → assistant replies and the Claude/Anthropic notice is visible; Settings toggle off
@@ -257,7 +260,7 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 > email address, postal address, scan results, data-broker listings, subscription status, or
 > any payment information to Anthropic.
 >
-> **Permission before sending.** In build 60 the Support chat now presents a disclosure screen
+> **Permission before sending.** In build 61 the Support chat now presents a disclosure screen
 > before any message is sent to the AI service. It states what is sent, names Anthropic as the
 > recipient, and explains the purpose. The user must tap "Agree and continue" before any data
 > leaves the device for the AI service. Users who decline can tap "Chat with our team instead,"
