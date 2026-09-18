@@ -152,3 +152,98 @@ be optional.
 > address fields remain available as optional inputs (labelled as optional) because they
 > improve match accuracy, but the app proceeds and functions fully without them. This is in
 > build 60. All other functionality is unchanged from the previously reviewed build.
+
+---
+
+# Resubmission — build 60, rejected 2026-09-18
+
+**Guidelines 5.1.1(i) and 5.1.2(i)** — the app shares personal data with a third-party AI
+service without disclosing what is sent, naming the recipient, or asking permission first.
+
+Apple offers two paths; only the first applies. The app **does** send user data to an AI
+service: `convex/supportBot.ts` calls the Anthropic Claude API from the in-app Support chat.
+The scope is narrow, and that is the argument to make:
+
+| | |
+|---|---|
+| Recipient | Anthropic, PBC (Claude API) |
+| Feature | In-app Support chat only. Nothing else in the product uses AI — scanning goes to Apify, not an AI service. |
+| Data sent | The text of the messages in that one conversation: the user's messages and the assistant's own prior replies (`supportBot.ts` maps only `user`/`bot` roles and their `text`). |
+| Data **not** sent | Name, email, postal address, scan results, broker listings, subscription/payment data. `support.getConversationContext` exposes `userEmail`/`userName` for the Slack mirror, and `supportBot.ts` never puts them in the request or the system prompt. |
+| Purpose | Generate a first-line support answer. |
+
+## Already done (this repo)
+
+- `convex/schema.ts`: `users.aiSupportConsent` / `aiSupportConsentAt`. Three states —
+  undefined (never asked), true (granted), false (declined or withdrawn).
+- `convex/support.ts`:
+  - `sendMessage` schedules `supportBot.reply` **only** when consent is `true`. Without it a
+    new conversation is created in `human` status and handed to the team.
+  - `setAiConsent` mutation records the answer; withdrawing moves an open bot conversation to
+    a human immediately.
+  - `aiConsent` query for the chat gate and the Settings toggle.
+  - `handOffToHuman` helper shared by `requestHuman`, the decline path and the withdraw path.
+  - `forCurrentUser` now returns an empty conversation instead of `null` when the user row
+    does not exist yet (that case used to leave the chat on a spinner forever).
+- `convex/supportBot.ts`: re-checks consent before building the request — the scheduling gate
+  should make this unreachable, but Apple tests that declining actually blocks the call.
+- `lib/legal.ts`: the disclosure copy (provider, what is sent, what is not) in one place, so
+  the app, the privacy policy and the App Review notes cannot drift apart.
+- `app/support-chat.tsx`: full-screen disclosure before the first message can be sent, with
+  "AGREE AND CONTINUE" / "Chat with our team instead" and a Privacy Policy link. While the
+  assistant is active, a standing line under the transcript names Claude and Anthropic.
+- `app/(tabs)/settings.tsx`: "AI support assistant" toggle to withdraw or re-grant consent.
+
+Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scanner.ts` /
+`data-for-nerds.tsx` errors and the `auth-provider.tsx` warnings.
+
+## To do before resubmitting
+
+1. **Privacy policy** at https://www.0tracelabs.com/privacy-policy — Apple requires it to
+   identify what data the app collects, how it collects it, all uses, and to confirm every
+   third party it is shared with gives the same or equal protection. Name Anthropic, and while
+   you are in there also cover **Slack** (`support.ts` mirrors every support message into a
+   Slack thread) and **Apify** (`scanner.ts` runs the broker scan). Apple's note that "only
+   including this information in the Terms of Service or Privacy Policy is not sufficient" is
+   about the in-app disclosure, which the build now has — the policy is still required.
+2. Confirm Anthropic's current Commercial Terms and your API retention settings still support
+   the "not used to train models" line before sending the reply.
+3. Check the **App Store Connect privacy nutrition labels** still match what is collected.
+4. Build and submit: `eas build --platform ios --profile production` (auto-increments to 61),
+   then `eas submit --platform ios --profile production`.
+5. Verify on the build: fresh account → Settings → Chat with Support → the disclosure appears
+   before any message box; decline → chat opens in team mode and no assistant reply arrives;
+   accept → assistant replies and the Claude/Anthropic notice is visible; Settings toggle off
+   → an open assistant conversation moves to the team.
+6. Paste the reply below into **App Review Information → Notes** and into the Resolution
+   Center thread.
+
+## Reviewer note / Resolution Center reply
+
+> Thank you for the review.
+>
+> **Confirmation of third-party AI use.** The app includes one feature that uses a third-party
+> AI service: the in-app Support chat. Support messages are sent to the Claude API operated by
+> Anthropic, PBC, solely to generate a first-line support answer. No other feature of the app
+> uses an AI service, and no AI service is used for scanning, removals, notifications, or billing.
+>
+> **What data is sent.** Only the text the user types into the Support chat, plus the
+> assistant's own prior replies in that same conversation. We do not send the user's name,
+> email address, postal address, scan results, data-broker listings, subscription status, or
+> any payment information to Anthropic.
+>
+> **Permission before sending.** In build 61 the Support chat now presents a disclosure screen
+> before any message is sent to the AI service. It states what is sent, names Anthropic as the
+> recipient, and explains the purpose. The user must tap "Agree and continue" before any data
+> leaves the device for the AI service. Users who decline can tap "Chat with our team instead,"
+> which routes the conversation directly to a human support agent with no AI involvement.
+> Consent is stored per user and enforced on the server — if consent is absent, no request to
+> Anthropic is made. Consent can be withdrawn at any time in Settings.
+>
+> **Privacy policy.** Our privacy policy at https://www.0tracelabs.com/privacy-policy has been
+> updated to identify the data we collect, how we collect it, all uses of that data, and the
+> third parties we share it with, including Anthropic. It confirms that Anthropic provides the
+> same or equal protection of user data as required by Apple's guidelines.
+>
+> We have also added this information to the App Review Information section in App Store
+> Connect. Please let us know if any further detail would be helpful.

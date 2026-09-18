@@ -25,14 +25,57 @@ async function activeConversation(
   return open[0] ?? null;
 }
 
+const HUMAN_HANDOFF_TEXT =
+  "You're now connected to our support team. Replies may take a little while — feel free to keep the chat open or check back later.";
+
+// Consent to the AI assistant, as the client needs to see it:
+//   "unset" -> show the disclosure before anything is sent to Anthropic
+//   "granted" | "declined" -> the user has answered; Settings can change it
+function consentState(user: Doc<"users">): "granted" | "declined" | "unset" {
+  if (user.aiSupportConsent === true) return "granted";
+  if (user.aiSupportConsent === false) return "declined";
+  return "unset";
+}
+
+// Take a conversation out of bot mode (or start it there) and tell both the user
+// and the team that a person will answer.
+async function handOffToHuman(
+  ctx: any,
+  conversationId: Doc<"supportConversations">["_id"],
+  slackNote: string
+) {
+  await ctx.db.patch(conversationId, {
+    status: "human",
+    lastMessageAt: Date.now(),
+  });
+  await ctx.db.insert("supportMessages", {
+    conversationId,
+    role: "system",
+    text: HUMAN_HANDOFF_TEXT,
+    sentAt: Date.now(),
+  });
+  // Delayed by a second so it lands after any message mirrored in the same
+  // mutation — the first post for a conversation creates the Slack thread, and
+  // two concurrent posts would create two.
+  await ctx.scheduler.runAfter(1000, internal.slack.postThreadMessage, {
+    conversationId,
+    text: slackNote,
+    prefix: "",
+  });
+}
+
 // Everything the chat widget needs, live via Convex reactivity.
 export const forCurrentUser = query({
   args: {},
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
-    if (!user) return null;
+    // No user row yet (first session, before the Clerk webhook lands): the chat is
+    // still usable — sendMessage creates the row — so report an empty, unconsented
+    // conversation rather than null, which the client would read as "still loading".
+    if (!user) return { conversation: null, messages: [], aiConsent: "unset" };
+    const aiConsent = consentState(user);
     const conversation = await activeConversation(ctx, user._id);
-    if (!conversation) return { conversation: null, messages: [] };
+    if (!conversation) return { conversation: null, messages: [], aiConsent };
     const messages = await ctx.db
       .query("supportMessages")
       .withIndex("by_conversation", (q) =>
@@ -40,6 +83,7 @@ export const forCurrentUser = query({
       )
       .collect();
     return {
+      aiConsent,
       conversation: { _id: conversation._id, status: conversation.status },
       messages: messages.map((m) => ({
         _id: m._id,
@@ -60,11 +104,15 @@ export const sendMessage = mutation({
     if (trimmed.length > 4000) throw new Error("Message too long");
 
     const user = await getOrCreateCurrentUser(ctx);
+    // The single gate on the third-party AI service. Without recorded consent the
+    // assistant is never called and the conversation is handled by a person.
+    const aiConsent = user.aiSupportConsent === true;
     let conversation = await activeConversation(ctx, user._id);
+    const isNewConversation = !conversation;
     if (!conversation) {
       const id = await ctx.db.insert("supportConversations", {
         userId: user._id,
-        status: "bot",
+        status: aiConsent ? "bot" : "human",
         lastMessageAt: Date.now(),
       });
       conversation = (await ctx.db.get(id))!;
@@ -85,11 +133,25 @@ export const sendMessage = mutation({
       prefix: "👤",
     });
 
-    // While the bot is handling the conversation, have it answer.
-    if (conversation.status === "bot") {
+    if (conversation.status === "bot" && aiConsent) {
+      // Consented and in bot mode — the assistant answers (this is the only path
+      // that reaches Anthropic; see convex/supportBot.ts).
       await ctx.scheduler.runAfter(0, internal.supportBot.reply, {
         conversationId: conversation._id,
       });
+    } else if (conversation.status === "bot") {
+      // Consent was withdrawn while a bot conversation was open.
+      await handOffToHuman(
+        ctx,
+        conversation._id,
+        "🙋 The user turned off the AI assistant. Reply in this thread and they'll see it in the app."
+      );
+    } else if (isNewConversation) {
+      await handOffToHuman(
+        ctx,
+        conversation._id,
+        "🙋 The user has not enabled the AI assistant, so this conversation starts with the team. Reply in this thread and they'll see it in the app."
+      );
     }
 
     return conversation._id;
@@ -105,22 +167,55 @@ export const requestHuman = mutation({
     if (!conversation) return null;
     if (conversation.status === "human") return conversation._id;
 
-    await ctx.db.patch(conversation._id, {
-      status: "human",
-      lastMessageAt: Date.now(),
-    });
-    await ctx.db.insert("supportMessages", {
-      conversationId: conversation._id,
-      role: "system",
-      text: "You're now connected to our support team. Replies may take a little while — feel free to keep the chat open or check back later.",
-      sentAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, internal.slack.postThreadMessage, {
-      conversationId: conversation._id,
-      text: "🙋 The user asked to talk to a human. Reply in this thread and they'll see it in the app.",
-      prefix: "",
-    });
+    await handOffToHuman(
+      ctx,
+      conversation._id,
+      "🙋 The user asked to talk to a human. Reply in this thread and they'll see it in the app."
+    );
     return conversation._id;
+  },
+});
+
+// ---- AI assistant consent (App Store Guidelines 5.1.1(i) / 5.1.2(i)) ----
+
+// Read by the Support chat (to decide whether to show the disclosure) and by
+// Settings (to render the toggle).
+export const aiConsent = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return { state: "unset" as const, grantedAt: null };
+    return {
+      state: consentState(user),
+      grantedAt: user.aiSupportConsentAt ?? null,
+    };
+  },
+});
+
+// Records the user's answer to the disclosure. Granting is the only thing that
+// ever lets a support message reach Anthropic; withdrawing takes effect
+// immediately, including for a conversation the assistant is already handling.
+export const setAiConsent = mutation({
+  args: { granted: v.boolean() },
+  handler: async (ctx, { granted }) => {
+    const user = await getOrCreateCurrentUser(ctx);
+    await ctx.db.patch(user._id, {
+      aiSupportConsent: granted,
+      aiSupportConsentAt: Date.now(),
+    });
+
+    if (!granted) {
+      const conversation = await activeConversation(ctx, user._id);
+      if (conversation && conversation.status === "bot") {
+        await handOffToHuman(
+          ctx,
+          conversation._id,
+          "🙋 The user turned off the AI assistant. Reply in this thread and they'll see it in the app."
+        );
+      }
+    }
+
+    return granted;
   },
 });
 
@@ -140,8 +235,10 @@ export const getConversationContext = internalQuery({
       .collect();
     return {
       conversation,
+      // Slack only: the transcript sent to Anthropic never includes these.
       userEmail: user?.email ?? "unknown user",
       userName: user?.name,
+      aiConsent: user?.aiSupportConsent === true,
       messages,
     };
   },
