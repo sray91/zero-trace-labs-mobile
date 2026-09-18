@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.zerotracelabs.app",
-      "buildNumber": "60",
+      "buildNumber": "61",
       "supportsTablet": true,
       "config": {
         "usesNonExemptEncryption": false
