@@ -258,3 +258,32 @@ export const backfillProxyEmails = internalMutation({
     return { updated };
   },
 });
+
+// Re-points existing proxy addresses at the current PROXY_EMAIL_DOMAIN, keeping each
+// user's local part so mail already routed to them keeps working. Run after changing
+// the Cloudflare Email Routing domain:
+//   npx convex run users:migrateProxyEmailDomains --prod
+//
+// NOTE: this mirrors an internalMutation of the same name already deployed on prod
+// (standing-swordfish-884), which is deployed from the web app repo and was missing
+// here. It is reconstructed from the deployed signature (internal mutation, no args)
+// and this file's proxy-address conventions, not copied from that repo — diff it
+// against the web app's version before deploying convex from here.
+export const migrateProxyEmailDomains = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const domain = process.env.PROXY_EMAIL_DOMAIN || "mail.0tracelabs.com";
+    const users = await ctx.db.query("users").collect();
+    let updated = 0;
+    for (const u of users) {
+      if (!u.proxyEmail) continue;
+      const localPart = u.proxyEmail.split("@")[0];
+      const next = `${localPart}@${domain}`;
+      if (next !== u.proxyEmail) {
+        await ctx.db.patch(u._id, { proxyEmail: next });
+        updated++;
+      }
+    }
+    return { updated, domain };
+  },
+});
