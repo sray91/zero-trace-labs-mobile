@@ -1,4 +1,13 @@
 import { api } from '@/convex/_generated/api';
+import {
+  AI_DATA_NOT_SENT,
+  AI_DATA_SENT,
+  AI_DISCLOSURE_FOOTER,
+  AI_DISCLOSURE_INTRO,
+  AI_PRODUCT,
+  AI_PROVIDER,
+  PRIVACY_POLICY_URL,
+} from '@/lib/legal';
 import { COLOR } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useConvexAuth, useMutation, useQuery } from 'convex/react';
@@ -10,9 +19,11 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +32,9 @@ import {
 
 const GREETING_TEXT =
   "Hi! I'm the 0TraceLabs assistant. Ask me anything about scans, removals, or your account — or tap \"Talk to a human\" and our team will jump in.";
+
+const HUMAN_GREETING_TEXT =
+  'Send us a message and our support team will get back to you here. You can turn the AI assistant on in Settings if you\'d like instant answers.';
 
 type ChatMessage = {
   _id: string;
@@ -64,6 +78,83 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
+/** Shown before the first message can reach the AI service. Nothing the user types
+ *  is sent anywhere until they choose one of the two buttons — declining routes the
+ *  conversation to a human instead. (App Store Guidelines 5.1.1(i) / 5.1.2(i).) */
+function AiDisclosure({
+  onAccept,
+  onDecline,
+  busy,
+}: {
+  onAccept: () => void;
+  onDecline: () => void;
+  busy: boolean;
+}) {
+  return (
+    <ScrollView
+      contentContainerStyle={styles.disclosureContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.disclosureIcon}>
+        <Ionicons name="sparkles" size={24} color={COLOR.nuclearStart} />
+      </View>
+
+      <Text style={styles.disclosureTitle}>Before we start</Text>
+      <Text style={styles.disclosureIntro}>{AI_DISCLOSURE_INTRO}</Text>
+
+      <View style={styles.disclosureCard}>
+        <Text style={styles.disclosureCardTitle}>What we send to {AI_PROVIDER}</Text>
+        {AI_DATA_SENT.map((item) => (
+          <View key={item} style={styles.disclosureItem}>
+            <Ionicons name="arrow-up-circle" size={15} color={COLOR.nuclearStart} />
+            <Text style={styles.disclosureItemText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.disclosureCard}>
+        <Text style={styles.disclosureCardTitle}>What we never send</Text>
+        {AI_DATA_NOT_SENT.map((item) => (
+          <View key={item} style={styles.disclosureItem}>
+            <Ionicons name="close-circle" size={15} color={COLOR.textMuted} />
+            <Text style={styles.disclosureItemText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={styles.disclosureFooter}>{AI_DISCLOSURE_FOOTER}</Text>
+
+      <Pressable onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} hitSlop={8}>
+        <Text style={styles.disclosureLink}>Read our Privacy Policy</Text>
+      </Pressable>
+
+      <Pressable
+        style={[styles.primaryButton, busy && styles.buttonDisabled]}
+        onPress={onAccept}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={`Agree and chat with the ${AI_PRODUCT} assistant`}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={COLOR.deepVoid} />
+        ) : (
+          <Text style={styles.primaryButtonText}>AGREE AND CONTINUE</Text>
+        )}
+      </Pressable>
+
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={onDecline}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Decline and chat with our team instead"
+      >
+        <Text style={styles.secondaryButtonText}>Chat with our team instead</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
 export default function SupportChatScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
@@ -71,9 +162,11 @@ export default function SupportChatScreen() {
   const data = useQuery(api.support.forCurrentUser, isAuthenticated ? {} : 'skip');
   const sendMessage = useMutation(api.support.sendMessage);
   const requestHuman = useMutation(api.support.requestHuman);
+  const setAiConsent = useMutation(api.support.setAiConsent);
 
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -90,20 +183,27 @@ export default function SupportChatScreen() {
   };
 
   const messages = useMemo<ChatMessage[]>(() => data?.messages ?? [], [data]);
-  const status = data?.conversation?.status ?? 'bot';
+  const aiConsent = data?.aiConsent ?? 'unset';
+  // Until the user has answered the disclosure, no message box is shown at all.
+  const needsConsent = aiConsent === 'unset';
+  const status = data?.conversation?.status ?? (aiConsent === 'granted' ? 'bot' : 'human');
   const isBot = status === 'bot';
   const waitingOnBot =
     isBot && messages.length > 0 && messages[messages.length - 1].role === 'user';
 
   // Inverted list: newest first, greeting last (renders at the top of the chat).
   const listItems = useMemo<ListItem[]>(() => {
+    const greeting = isBot ? GREETING_TEXT : HUMAN_GREETING_TEXT;
     const items: ListItem[] = [
-      { kind: 'message', message: { _id: 'greeting', role: 'bot', text: GREETING_TEXT } },
+      {
+        kind: 'message',
+        message: { _id: 'greeting', role: isBot ? 'bot' : 'agent', text: greeting },
+      },
       ...messages.map((m: ChatMessage): ListItem => ({ kind: 'message', message: m })),
     ];
     if (waitingOnBot) items.push({ kind: 'typing' });
     return items.reverse();
-  }, [messages, waitingOnBot]);
+  }, [messages, waitingOnBot, isBot]);
 
   const handleSend = async () => {
     const text = draft.trim();
@@ -120,6 +220,17 @@ export default function SupportChatScreen() {
     }
   };
 
+  const handleConsent = async (granted: boolean) => {
+    setSavingConsent(true);
+    try {
+      await setAiConsent({ granted });
+    } catch {
+      showError("Couldn't save your choice. Please try again.");
+    } finally {
+      setSavingConsent(false);
+    }
+  };
+
   const handleRequestHuman = async () => {
     try {
       await requestHuman();
@@ -129,7 +240,7 @@ export default function SupportChatScreen() {
   };
 
   const signedOut = !authLoading && !isAuthenticated;
-  const loading = !signedOut && (authLoading || data === undefined || data === null);
+  const loading = !signedOut && (authLoading || data === undefined);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -153,7 +264,7 @@ export default function SupportChatScreen() {
             {status === 'human' ? 'Connected to our team' : 'Ask us anything about 0TraceLabs'}
           </Text>
         </View>
-        {isBot ? (
+        {isBot && !needsConsent ? (
           <Pressable onPress={handleRequestHuman} hitSlop={8} style={styles.humanButton}>
             <Ionicons name="headset" size={13} color={COLOR.nuclearStart} />
             <Text style={styles.humanButtonText}>Talk to a human</Text>
@@ -178,6 +289,12 @@ export default function SupportChatScreen() {
         <View style={styles.centerFill}>
           <ActivityIndicator size="large" color={COLOR.nuclearStart} />
         </View>
+      ) : needsConsent ? (
+        <AiDisclosure
+          onAccept={() => handleConsent(true)}
+          onDecline={() => handleConsent(false)}
+          busy={savingConsent}
+        />
       ) : (
         <KeyboardAvoidingView
           style={styles.chatArea}
@@ -204,6 +321,13 @@ export default function SupportChatScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           />
+
+          {isBot && (
+            <Text style={styles.aiNotice}>
+              Replies are generated by {AI_PRODUCT} ({AI_PROVIDER}) from the messages in
+              this chat. Turn this off in Settings.
+            </Text>
+          )}
 
           {error && (
             <View style={styles.errorBanner}>
@@ -303,6 +427,99 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   chatArea: { flex: 1 },
+
+  // ---- AI disclosure gate ----
+  disclosureContent: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 },
+  disclosureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLOR.glassBg,
+    borderWidth: 1,
+    borderColor: COLOR.glassBorder,
+    marginBottom: 14,
+  },
+  disclosureTitle: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 22,
+    color: COLOR.white,
+    marginBottom: 8,
+  },
+  disclosureIntro: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLOR.textMuted,
+    marginBottom: 18,
+  },
+  disclosureCard: {
+    backgroundColor: COLOR.glassBg,
+    borderColor: COLOR.glassBorder,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    gap: 9,
+  },
+  disclosureCardTitle: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13,
+    color: COLOR.white,
+  },
+  disclosureItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  disclosureItemText: {
+    flex: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLOR.textMuted,
+  },
+  disclosureFooter: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLOR.textMuted,
+    marginTop: 6,
+  },
+  disclosureLink: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: COLOR.nuclearStart,
+    marginTop: 12,
+    marginBottom: 22,
+  },
+  primaryButton: {
+    borderRadius: 999,
+    backgroundColor: COLOR.nuclearStart,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 13,
+    letterSpacing: 1,
+    color: COLOR.deepVoid,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  secondaryButton: { paddingVertical: 16, alignItems: 'center' },
+  secondaryButtonText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: COLOR.nuclearStart,
+  },
+  aiNotice: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    lineHeight: 15,
+    color: COLOR.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+  },
+
   listContent: { paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
   bubbleRow: { flexDirection: 'row' },
   rowLeft: { justifyContent: 'flex-start' },

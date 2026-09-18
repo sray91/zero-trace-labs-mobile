@@ -19,6 +19,15 @@ export default defineSchema({
     // routed (Cloudflare Email Routing -> /inbound-email) into `inboxMessages`.
     // Generated on first sync (convex/users.ts) and backfilled for existing users.
     proxyEmail: v.optional(v.string()),
+    // Explicit consent to send Support-chat messages to Anthropic's Claude API
+    // (App Store Guidelines 5.1.1(i) / 5.1.2(i)). Three states:
+    //   undefined = never asked -> the app shows the disclosure before the first
+    //               message and the assistant is not called;
+    //   true      = granted -> supportBot.reply may run;
+    //   false     = declined/withdrawn -> support chats go straight to a human.
+    // Enforced server-side in convex/support.ts; withdrawable in Settings.
+    aiSupportConsent: v.optional(v.boolean()),
+    aiSupportConsentAt: v.optional(v.number()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_proxy_email", ["proxyEmail"]),

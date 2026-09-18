@@ -9,6 +9,14 @@ import Anthropic from "@anthropic-ai/sdk";
 // help (or the user asks for a person) it emits [ESCALATE] and the conversation
 // is handed to the team in Slack. Requires ANTHROPIC_API_KEY on the Convex
 // deployment; without it every message escalates straight to Slack.
+//
+// Third-party data sharing (App Store Guidelines 5.1.1(i) / 5.1.2(i)): this is the
+// only place in the product that sends user data to an AI service. What leaves is
+// the text of this support conversation — the user's messages and the assistant's
+// own prior replies — and nothing else: no name, email, address, scan results,
+// broker listings, subscription or payment data. It runs only for users who have
+// accepted the disclosure in the Support chat; convex/support.ts gates the call and
+// the consent is re-checked below before the request is built.
 
 const SYSTEM_PROMPT = `You are the support assistant for 0TraceLabs, a personal-data-removal service. Customers use the web app to scan ~93 data-broker sites (Spokeo, BeenVerified, Whitepages, etc.), see where their personal information is exposed, and track opt-out/removal requests through statuses like "searched", "submitted", and "removed". The service also gives each customer a private proxy email address that broker verification emails are routed to, so removals can be confirmed without exposing their real inbox. Billing is handled through subscriptions (managed in Settings); sign-in uses email via Clerk.
 
@@ -43,6 +51,14 @@ export const reply = internalAction({
         prefix: "",
       });
     };
+
+    if (!context.aiConsent) {
+      // Belt and braces: support.ts should never schedule this without consent.
+      await escalate(
+        "You're now connected to our support team. Replies may take a little while — feel free to keep the chat open or check back later."
+      );
+      return;
+    }
 
     if (!process.env.ANTHROPIC_API_KEY) {
       // Bot not configured — hand straight to the team.

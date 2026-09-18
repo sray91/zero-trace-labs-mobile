@@ -1,10 +1,11 @@
 import { api } from '@/convex/_generated/api';
+import { AI_PRODUCT, AI_PROVIDER } from '@/lib/legal';
 import { revenueCatService } from '@/lib/revenue-cat';
 import { useClerkAuth } from '@/lib/stores/auth-store';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 import { COLOR } from '@/lib/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +20,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -38,6 +40,8 @@ export default function SettingsScreen() {
   const { signOut, user } = useClerkAuth();
   const profile = useQuery(api.users.getProfile);
   const entitlement = useQuery(api.subscriptions.getEntitlement);
+  const aiConsent = useQuery(api.support.aiConsent);
+  const setAiConsent = useMutation(api.support.setAiConsent);
   const isEntitled = useSubscriptionStore((s) => s.isEntitled);
   const isRestoring = useSubscriptionStore((s) => s.isRestoring);
   const restorePurchases = useSubscriptionStore((s) => s.restorePurchases);
@@ -55,6 +59,16 @@ export default function SettingsScreen() {
         year: 'numeric',
       })
     : null;
+
+  // Withdrawing takes effect immediately: convex/support.ts stops calling the AI
+  // service and moves any open conversation to a human.
+  const handleAiConsentChange = async (granted: boolean) => {
+    try {
+      await setAiConsent({ granted });
+    } catch {
+      Alert.alert('Something went wrong', 'Please try again.');
+    }
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -230,6 +244,30 @@ export default function SettingsScreen() {
             </View>
           </GlassCard>
         </Pressable>
+
+        {/* AI assistant consent — App Store Guidelines 5.1.1(i) / 5.1.2(i). */}
+        <GlassCard style={styles.supportCard}>
+          <View style={styles.infoRow}>
+            <Ionicons name="sparkles" size={22} color={COLOR.nuclearStart} />
+            <View style={styles.infoCopy}>
+              <Text style={styles.infoTitle}>AI support assistant</Text>
+              <Text style={styles.infoBody}>
+                When this is on, the messages you type in the Support chat are sent to{' '}
+                {AI_PRODUCT}, an AI service operated by {AI_PROVIDER}, to generate a reply.
+                Your name, address, scan results and payment details are never sent. Turn it
+                off and your messages go only to our support team.
+              </Text>
+            </View>
+            <Switch
+              value={aiConsent?.state === 'granted'}
+              onValueChange={handleAiConsentChange}
+              disabled={aiConsent === undefined}
+              trackColor={{ false: COLOR.glassBorder, true: COLOR.nuclearStart }}
+              thumbColor={COLOR.white}
+              accessibilityLabel="Allow the AI support assistant"
+            />
+          </View>
+        </GlassCard>
 
         <Pressable style={styles.dangerButton} onPress={handleLogout}>
           <Text style={styles.dangerButtonText}>SIGN OUT</Text>
