@@ -155,10 +155,17 @@ be optional.
 
 ---
 
-# Resubmission — build 60, rejected 2026-09-18
+# Resubmission — rejected 2026-09-18
 
 **Guidelines 5.1.1(i) and 5.1.2(i)** — the app shares personal data with a third-party AI
 service without disclosing what is sent, naming the recipient, or asking permission first.
+
+> **Build numbering.** The latest iOS build on EAS is **59** (finished 2026-09-08, from commit
+> `530d8d0a`, which is not in this repo or on origin). There is no build 60 on EAS, and the
+> 5.1.1(v) address fix (`71a16be`, 2026-09-15) has never been built here. `app.json` is at 59,
+> so `autoIncrement` makes the next production build **60**, carrying both the address fix and
+> the AI consent work. Confirm nothing was uploaded to App Store Connect outside EAS before
+> relying on 60 being free.
 
 Apple offers two paths; only the first applies. The app **does** send user data to an AI
 service: `convex/supportBot.ts` calls the Anthropic Claude API from the in-app Support chat.
@@ -209,13 +216,19 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 2. Confirm Anthropic's current Commercial Terms and your API retention settings still support
    the "not used to train models" line before sending the reply.
 3. Check the **App Store Connect privacy nutrition labels** still match what is collected.
-4. Build and submit: `eas build --platform ios --profile production` (auto-increments to 61),
+4. **Deploy the Convex functions to prod first.** The consent gate lives in `convex/`, and per
+   the notes above the prod deployment (`standing-swordfish-884`) is shared with the web app
+   repo and deployed from there. Until `support.aiConsent` / `support.setAiConsent` exist on
+   prod, the new Support chat screen calls functions that are not there. Reconcile the two
+   `convex/` folders and deploy from whichever repo owns prod — do not `convex deploy` from
+   here without checking, it would replace the web app's functions.
+5. Build and submit: `eas build --platform ios --profile production` (auto-increments to 60),
    then `eas submit --platform ios --profile production`.
-5. Verify on the build: fresh account → Settings → Chat with Support → the disclosure appears
+6. Verify on the build: fresh account → Settings → Chat with Support → the disclosure appears
    before any message box; decline → chat opens in team mode and no assistant reply arrives;
    accept → assistant replies and the Claude/Anthropic notice is visible; Settings toggle off
    → an open assistant conversation moves to the team.
-6. Paste the reply below into **App Review Information → Notes** and into the Resolution
+7. Paste the reply below into **App Review Information → Notes** and into the Resolution
    Center thread.
 
 ## Reviewer note / Resolution Center reply
@@ -232,7 +245,7 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 > email address, postal address, scan results, data-broker listings, subscription status, or
 > any payment information to Anthropic.
 >
-> **Permission before sending.** In build 61 the Support chat now presents a disclosure screen
+> **Permission before sending.** In build 60 the Support chat now presents a disclosure screen
 > before any message is sent to the AI service. It states what is sent, names Anthropic as the
 > recipient, and explains the purpose. The user must tap "Agree and continue" before any data
 > leaves the device for the AI service. Users who decline can tap "Chat with our team instead,"
