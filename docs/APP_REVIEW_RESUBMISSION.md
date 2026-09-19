@@ -222,7 +222,11 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 2. Confirm Anthropic's current Commercial Terms and your API retention settings still support
    the "not used to train models" line before sending the reply.
 3. Check the **App Store Connect privacy nutrition labels** still match what is collected.
-4. **Deploy the Convex functions to prod first — this blocks submission.** With the old
+4. ~~**Deploy the Convex functions to prod first — this blocks submission.**~~ **DONE
+   2026-09-19.** Verified against `standing-swordfish-884`: `support:aiConsent` and
+   `support:setAiConsent` are live, `support:forCurrentUser` returns the new object shape
+   (`{"aiConsent":"unset",…}`) rather than bare `null`, and `users:migrateProxyEmailDomains`
+   survived the push — 61 functions, the original 59 plus the two new ones. Original note: With the old
    functions deployed, a reviewer opening Support chat sees the disclosure, taps "Agree and
    continue", and gets "Couldn't save your choice": the gate cannot be passed. That is a worse
    rejection than the one being answered.
