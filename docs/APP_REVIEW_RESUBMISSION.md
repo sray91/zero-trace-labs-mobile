@@ -102,8 +102,9 @@ Gotchas learned while fixing it:
   functions are deployed from there. The `convex/` changes in this repo (fail-closed webhook,
   `ENFORCE_SUBSCRIPTIONS` gating) are **not** on prod. Deploying from this repo would replace
   the web app's functions — reconcile the two `convex/` folders before running `convex deploy`.
-  (**Stale as of 2026-09-18** — a function-level diff found the two folders in sync apart from
-  the AI consent gate and one migration. See the 2026-09-18 section at the end of this file.)
+  (**Wrong — corrected 2026-09-22.** The web app repo has no `convex/` directory at all and
+  does not depend on the `convex` package; it uses Supabase. This repo owns the prod Convex
+  deployment outright, so deploying from here is safe and is how it should be done.)
 
 ### 6. Build and submit
 ```bash
@@ -212,13 +213,17 @@ Verified: `tsc --noEmit` and `expo lint` clean apart from the pre-existing `scan
 
 ## To do before resubmitting
 
-1. **Privacy policy** at https://www.0tracelabs.com/privacy-policy — Apple requires it to
-   identify what data the app collects, how it collects it, all uses, and to confirm every
-   third party it is shared with gives the same or equal protection. Name Anthropic, and while
-   you are in there also cover **Slack** (`support.ts` mirrors every support message into a
-   Slack thread) and **Apify** (`scanner.ts` runs the broker scan). Apple's note that "only
-   including this information in the Terms of Service or Privacy Policy is not sufficient" is
-   about the in-app disclosure, which the build now has — the policy is still required.
+1. ~~**Privacy policy**~~ **DONE 2026-09-22**, in the web app repo
+   (`zero-trace-labs`, commit `7fb8f00`, `app/privacy-policy/page.jsx`). The sharing section
+   named only categories, which identifies nobody; it now names every recipient and what each
+   one receives — Anthropic, Apify, Slack, Clerk, Convex, Supabase, Apple/RevenueCat/Whop,
+   Expo/APNs, Cloudflare, PostHog, Vercel — plus an **AI Services** subsection covering what is
+   and is not sent to Anthropic, the consent step, the human alternative, and withdrawal.
+   Also pinned the "Last updated" date, which called `new Date()` during render and so claimed
+   the policy had been revised on whatever day it was viewed.
+
+   Confirm it is live on https://www.0tracelabs.com/privacy-policy before replying to Apple —
+   the reply asserts it, and it is the one claim a reviewer checks in seconds.
 2. Confirm Anthropic's current Commercial Terms and your API retention settings still support
    the "not used to train models" line before sending the reply.
 3. Check the **App Store Connect privacy nutrition labels** still match what is collected.
