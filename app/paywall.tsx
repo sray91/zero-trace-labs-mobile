@@ -43,6 +43,9 @@ export default function PaywallScreen() {
     'checking'
   );
   const [showPaywall, setShowPaywall] = useState(false);
+  // Free-trial length the user is eligible for, or null. Drives the CTA and the
+  // trial disclosure below — never claim a trial Apple won't actually grant.
+  const [trialDays, setTrialDays] = useState<number | null>(null);
   const { signOut } = useClerkAuth();
   const restorePurchases = useSubscriptionStore((s) => s.restorePurchases);
   const isRestoring = useSubscriptionStore((s) => s.isRestoring);
@@ -51,7 +54,9 @@ export default function PaywallScreen() {
     let cancelled = false;
     (async () => {
       const offering = await revenueCatService.getOfferings();
+      const days = offering ? await revenueCatService.getFreeTrialDays(offering) : null;
       if (cancelled) return;
+      setTrialDays(days);
       setOfferingState(offering ? 'ready' : 'unavailable');
     })();
     return () => {
@@ -134,6 +139,12 @@ export default function PaywallScreen() {
           ))}
         </View>
 
+        {trialDays ? (
+          <Text style={styles.trialBadge}>
+            {trialLabel(trialDays).toUpperCase()} FREE · THEN
+          </Text>
+        ) : null}
+
         <View style={styles.priceRow}>
           <View style={styles.priceBlock}>
             <Text style={styles.priceValue}>$14.99</Text>
@@ -163,7 +174,9 @@ export default function PaywallScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.cta}
             >
-              <Text style={styles.ctaText}>SEE PLANS</Text>
+              <Text style={styles.ctaText}>
+                {trialDays ? `START ${trialLabel(trialDays, true).toUpperCase()} FREE TRIAL` : 'SEE PLANS'}
+              </Text>
             </LinearGradient>
           </Pressable>
         )}
@@ -188,10 +201,9 @@ export default function PaywallScreen() {
         </Pressable>
 
         <Text style={styles.legalText}>
-          Auto-renewable subscription: $14.99 per month or $149.99 per year. Payment is charged
-          to your Apple ID account at confirmation of purchase. The subscription renews
-          automatically unless cancelled at least 24 hours before the end of the current
-          period. Manage or cancel anytime in your App Store account settings.
+          {trialDays
+            ? `Free trial for ${trialLabel(trialDays)}, then auto-renewable subscription: $14.99 per month or $149.99 per year. Payment is charged to your Apple ID account when the trial ends unless you cancel at least 24 hours before it ends. The subscription then renews automatically unless cancelled at least 24 hours before the end of the current period. Any unused portion of the free trial is forfeited when you purchase a subscription. Manage or cancel anytime in your App Store account settings.`
+            : 'Auto-renewable subscription: $14.99 per month or $149.99 per year. Payment is charged to your Apple ID account at confirmation of purchase. The subscription renews automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.'}
         </Text>
         <View style={styles.legalLinks}>
           <Pressable onPress={() => Linking.openURL(TERMS_OF_USE_URL)} hitSlop={8}>
@@ -205,6 +217,16 @@ export default function PaywallScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+/**
+ * "2 weeks" for 14 days, otherwise "N days" — matches how App Store Connect labels
+ * trials. `asAdjective` gives the hyphenated singular ("2-week free trial").
+ */
+function trialLabel(days: number, asAdjective = false): string {
+  const [count, unit] = days % 7 === 0 ? [days / 7, 'week'] : [days, 'day'];
+  if (asAdjective) return `${count}-${unit}`;
+  return count === 1 ? `1 ${unit}` : `${count} ${unit}s`;
 }
 
 const styles = StyleSheet.create({
@@ -266,6 +288,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: COLOR.white,
+  },
+  trialBadge: {
+    fontFamily: 'Outfit_600SemiBold',
+    fontSize: 12,
+    color: COLOR.successStart,
+    letterSpacing: 1,
+    marginBottom: 10,
   },
   priceRow: {
     flexDirection: 'row',

@@ -72,7 +72,14 @@ const slugify = (value?: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-function statusForEvent(type: string): string {
+// period_type is TRIAL while the user is inside the App Store / Play free trial;
+// the first paid RENEWAL arrives with period_type NORMAL and flips them to active.
+function statusForEvent(type: string, periodType?: string): string {
+  const status = baseStatusForEvent(type);
+  return status === "active" && periodType === "TRIAL" ? "trialing" : status;
+}
+
+function baseStatusForEvent(type: string): string {
   switch (type) {
     case "EXPIRATION":
     case "SUBSCRIPTION_PAUSED":
@@ -125,7 +132,7 @@ http.route({
 
     await ctx.runMutation(internal.subscriptions.upsertFromRevenueCat, {
       revenueCatAppUserId: event.app_user_id,
-      status: statusForEvent(event.type),
+      status: statusForEvent(event.type, event.period_type),
       plan,
       planLabel,
       entitlementId,

@@ -182,7 +182,11 @@ export default function SettingsScreen() {
               <Text style={styles.infoTitle}>{planLabel}</Text>
               <Text style={styles.infoBody}>
                 {isPaid
-                  ? renewsOn
+                  ? entitlement?.status === 'trialing'
+                    ? renewsOn
+                      ? `Free trial ends on ${renewsOn}. Your plan then renews automatically unless you cancel at least 24 hours before.`
+                      : 'You’re on a free trial.'
+                    : renewsOn
                     ? `Your plan renews on ${renewsOn}.`
                     : 'Your plan is active.'
                   : 'Subscribe for $14.99/month or $149.99/year to keep removals running.'}
