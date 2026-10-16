@@ -1,6 +1,7 @@
 # Privacy policy — data collection, use and sharing
 
-Ready-to-publish copy for https://www.0tracelabs.com/privacy-policy, written to satisfy
+Published 2026-10-16 to https://www.0tracelabs.com/privacy-policy (`zero-trace-labs` repo,
+`app/privacy-policy/page.jsx`). Ready-to-publish copy, written to satisfy
 App Store Guideline 5.1.1(i): the policy must identify **what** data the app collects,
 **how** it collects it, **all uses** of that data, and confirm that every third party the
 data is shared with provides the same or equal protection.
@@ -63,7 +64,7 @@ own purposes.
 | **Slack** | Your support messages, and your name and email address, in a private internal channel. | So our support team can read and reply to your conversation. |
 | **Clerk** | Your email address, name and profile image. | To create and secure your account and sign you in. |
 | **Convex** | All of the data listed above. | It hosts our database and backend. |
-| **Beehiiv** **[CONFIRM]** | Your email address. | To send our newsletter, if you subscribed. Only include this row if the Beehiiv integration is live and users are told they are being subscribed. |
+| **Beehiiv** | Your email address, if you subscribed to the newsletter or signed up for a free trial on the website (the old Supabase signup trigger). App sign-ups are not sent. | To send our newsletter. |
 | **RevenueCat** and **Apple** | Your subscription identifiers and purchase receipts. | To manage and validate your subscription. |
 | **Expo** | Your device push token and the text of the notification, which may include the first 140 characters of a support reply. | To deliver push notifications. |
 | **Cloudflare** | Email sent to your proxy address. | To route broker verification emails to us. |
