@@ -28,6 +28,9 @@ export default defineSchema({
     // Enforced server-side in convex/support.ts; withdrawable in Settings.
     aiSupportConsent: v.optional(v.boolean()),
     aiSupportConsentAt: v.optional(v.number()),
+    // Beehiiv newsletter integration (production-only, not in the seed schema)
+    beehiivSubscribedAt: v.optional(v.number()),
+    beehiivSubscriberId: v.optional(v.string()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_proxy_email", ["proxyEmail"]),
@@ -137,6 +140,30 @@ export default defineSchema({
     email: v.optional(v.string()),
     results: v.optional(v.any()),
   }).index("by_user", ["userId"]),
+
+  // Reverse phone lookups. Free for all signed-in users (marketing hook).
+  // Each row logs a number the user looked up, what the app determined about it
+  // (line type, area-code region, matching phone-lookup brokers), and lets the
+  // user flag numbers that texted/called them so they can track patterns.
+  phoneLookups: defineTable({
+    userId: v.id("users"),
+    // E.164-ish normalized digits (US: 10 digits, no country code prefix stored separately)
+    normalizedNumber: v.string(),
+    rawInput: v.string(),
+    lineTypeGuess: v.optional(v.string()), // mobile | landline | voip | toll_free | unknown
+    region: v.optional(v.string()), // area-code geography, e.g. "Columbus, OH"
+    areaCode: v.optional(v.string()),
+    isValid: v.boolean(),
+    // Why the user looked it up
+    context: v.optional(v.string()), // texted_me | called_me | found_online | other
+    notes: v.optional(v.string()),
+    // Brokers in the catalog that accept phone-based search (matched at lookup time)
+    searchableBrokerIds: v.optional(v.array(v.id("dataSources"))),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_number", ["userId", "normalizedNumber"])
+    .index("by_number", ["normalizedNumber"]),
 
   removalRequests: defineTable({
     userId: v.id("users"),
