@@ -188,8 +188,40 @@ Recommended at group level: enable **Billing Grace Period**, so a failed payment
 instantly revoke access. That maps to the `past_due` status the webhook already treats as
 still-paid (`convex/subscriptions.ts:31`).
 
-Skip introductory offers / free trials unless you want them — adding one changes the
-paywall copy and the review notes.
+#### 2-week free trial (Introductory Offer)
+
+New subscribers get 14 days free, then are billed automatically. Set it up on **each**
+subscription (monthly and annual):
+
+- [ ] Subscription → **Subscription Prices** → **Introductory Offers** → **+**
+- [ ] Countries/regions: all · Start date: today · End date: none
+- [ ] Type: **Free** · Duration: **2 Weeks**
+- [ ] Add to the review notes: "New subscribers receive a 2-week free trial, then the
+      subscription auto-renews at the listed price."
+
+Apple grants an intro offer **once per subscription group per Apple ID**: someone who
+trialed monthly can't trial annual too. You don't need to enforce that; Apple does.
+
+The app reads the offer and the user's eligibility from the store, so nothing here is
+hardcoded except the fallback price figures:
+
+- `lib/revenue-cat.ts:getFreeTrialDays` — eligibility check (iOS) / intro price (Android)
+- `app/paywall.tsx` — "Start 2-week free trial" CTA and trial terms in the legal copy,
+  shown only to eligible users (App Review 3.1.2 requires the disclosure)
+- `convex/http.ts:statusForEvent` — RevenueCat events with `period_type: TRIAL` are
+  stored as `trialing` (counts as paid); the first paid renewal flips to `active`
+- `app/(tabs)/settings.tsx` — shows "Free trial ends on …" while trialing
+
+The RevenueCat hosted paywall shows the trial automatically once the offer exists; make
+sure the paywall template's CTA uses the intro-offer variable (e.g. "Start free trial")
+in the RevenueCat paywall editor.
+
+On Android, add the equivalent free-trial **offer** (14 days, new customers only) to each
+base plan in Play Console.
+
+**Testing:** sandbox time is compressed — the trial lasts only a few minutes, so you can
+watch trial → renewal end to end. To retest eligibility, clear the sandbox tester's
+purchase history (Settings → App Store → Sandbox Account → Manage).
 
 ### 5.4 In-App Purchase Key (RevenueCat needs this)
 

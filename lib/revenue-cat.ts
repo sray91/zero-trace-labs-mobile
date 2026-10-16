@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import Purchases, {
     CustomerInfo,
     LOG_LEVEL,
+    PurchasesIntroPrice,
     PurchasesOffering,
     PurchasesPackage,
 } from 'react-native-purchases';
@@ -141,6 +142,43 @@ export class RevenueCatService {
         }
     }
 
+    /**
+     * Length of the free trial this user would get on `offering`, in days, or null if
+     * none applies. The trial itself is an Introductory Offer configured on the products
+     * in App Store Connect / Play Console — this only reads it so the paywall copy can
+     * disclose it (App Review 3.1.2).
+     *
+     * Apple grants an intro offer once per subscription group, so a user who already
+     * used their trial must not be told they'll get one. iOS reports that via the
+     * eligibility check; Play only returns an intro price when the user is eligible.
+     */
+    async getFreeTrialDays(offering: PurchasesOffering): Promise<number | null> {
+        if (!this.isInitialized) return null;
+        const trialProducts = offering.availablePackages
+            .map((pkg) => pkg.product)
+            .filter((product) => product.introPrice?.price === 0);
+        if (trialProducts.length === 0) return null;
+
+        try {
+            if (Platform.OS === 'ios') {
+                const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility(
+                    trialProducts.map((product) => product.identifier)
+                );
+                const eligible = trialProducts.filter(
+                    (product) =>
+                        eligibility[product.identifier]?.status ===
+                        Purchases.INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+                );
+                if (eligible.length === 0) return null;
+                return introPeriodDays(eligible[0].introPrice!);
+            }
+            return introPeriodDays(trialProducts[0].introPrice!);
+        } catch (error) {
+            console.error('Error checking trial eligibility:', error);
+            return null;
+        }
+    }
+
     /** Purchase a package. Returns null if the user cancelled; throws on real failures. */
     async purchasePackage(pkg: PurchasesPackage): Promise<{
         customerInfo: CustomerInfo;
@@ -195,6 +233,12 @@ export class RevenueCatService {
     ): boolean {
         return customerInfo.entitlements.active[entitlementId] !== undefined;
     }
+}
+
+const DAYS_PER_UNIT: Record<string, number> = { DAY: 1, WEEK: 7, MONTH: 30, YEAR: 365 };
+
+function introPeriodDays(introPrice: PurchasesIntroPrice): number {
+    return (DAYS_PER_UNIT[introPrice.periodUnit] ?? 1) * introPrice.periodNumberOfUnits;
 }
 
 export const revenueCatService = RevenueCatService.getInstance();
