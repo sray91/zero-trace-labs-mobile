@@ -23,6 +23,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_CONVEX_URL": "https://standing-swordfish-884.convex.cloud",
