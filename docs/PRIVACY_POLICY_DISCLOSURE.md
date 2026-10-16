@@ -6,7 +6,8 @@ App Store Guideline 5.1.1(i): the policy must identify **what** data the app col
 data is shared with provides the same or equal protection.
 
 Everything below is derived from this repo (`convex/schema.ts`, `convex/scanner.ts`,
-`convex/supportBot.ts`, `convex/slack.ts`, `convex/pushNotifications.ts`, `convex/http.ts`).
+`convex/supportBot.ts`, `convex/slack.ts`, `convex/pushNotifications.ts`, `convex/http.ts`,
+`convex/phoneLookups.ts`).
 Items marked **[CONFIRM]** cannot be verified from the code — check them before publishing.
 
 ---
@@ -25,6 +26,8 @@ Items marked **[CONFIRM]** cannot be verified from the code — check them befor
 | Subscription status, plan and renewal date | From Apple and our subscription provider when you purchase or renew |
 | Device push token | From your device, if you allow notifications |
 | Support conversations: the messages you send us and our replies | From you, when you use the in-app Support chat |
+| Phone numbers you look up, what prompted the lookup (texted you, called you, found online, other), any notes you add, and when you looked it up | From you, when you use the Numbers tab |
+| Free-trial status and trial end date | From Apple and our subscription provider when you start a free trial |
 
 We do not collect or store payment card details. Purchases are handled by Apple.
 
@@ -37,6 +40,10 @@ We do not collect or store payment card details. Purchases are handled by Apple.
 - To show your dashboard and removal history.
 - To notify you about removal progress and support replies.
 - To answer your support questions.
+- To show you the region and type of a phone number you look up, list the people-search sites
+  that can be searched by phone number, and keep a private list of the numbers you have
+  looked up so you can spot repeat callers and texters. We do not contact the numbers you look
+  up, share them with anyone, or use them to build a profile of the person behind them.
 - To manage your subscription and entitlements.
 - To secure accounts and prevent abuse.
 
@@ -56,6 +63,7 @@ own purposes.
 | **Slack** | Your support messages, and your name and email address, in a private internal channel. | So our support team can read and reply to your conversation. |
 | **Clerk** | Your email address, name and profile image. | To create and secure your account and sign you in. |
 | **Convex** | All of the data listed above. | It hosts our database and backend. |
+| **Beehiiv** **[CONFIRM]** | Your email address. | To send our newsletter, if you subscribed. Only include this row if the Beehiiv integration is live and users are told they are being subscribed. |
 | **RevenueCat** and **Apple** | Your subscription identifiers and purchase receipts. | To manage and validate your subscription. |
 | **Expo** | Your device push token and the text of the notification, which may include the first 140 characters of a support reply. | To deliver push notifications. |
 | **Cloudflare** | Email sent to your proxy address. | To route broker verification emails to us. |
@@ -70,9 +78,24 @@ determinable from the app's code.
 
 ---
 
+## A note on numbers you look up
+
+Phone numbers you enter in the Numbers tab may belong to other people. We store them only in
+your account, visible only to you, and use them only to show you the lookup result and your
+history. We never send them to data brokers, to the people behind the numbers, or to any
+third party other than our database host. You can delete any number from your list at any
+time, and all of them are deleted when you delete your account.
+
+---
+
 ## Also update
 
-- **App Store Connect → App Privacy** — the nutrition labels must match the table above.
+- **App Store Connect → App Privacy** — the nutrition labels must match the table above. For
+  the Numbers tab (new in 1.8.0), add:
+  - **Data type:** User Content → *Other User Content* (the looked-up numbers and notes)
+  - **Use:** App Functionality
+  - **Linked to the user's identity:** Yes
+  - **Used for tracking:** No
 - **In-app disclosure** — already shipped in build 60 (`lib/legal.ts` holds the copy). Apple's
   note that "only including this information in the Terms of Service or Privacy Policy is not
   sufficient" refers to this; the policy is still required in addition.
