@@ -6,7 +6,8 @@ import {
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // Resolve the Convex user document for the authenticated Clerk identity.
 export async function getCurrentUser(
@@ -223,6 +224,124 @@ export const deleteFromClerk = internalMutation({
     if (profile) await ctx.db.delete(profile._id);
 
     await ctx.db.delete(user._id);
+
+    // Everything else linked to the account goes in batches (App Review 5.1.1(v)).
+    await ctx.scheduler.runAfter(0, internal.users.purgeUserData, {
+      userId: user._id,
+      clerkId: args.clerkId,
+    });
+  },
+});
+
+// Every table holding per-user rows, all indexed `by_user`. A new per-user table must be
+// added here, or deleting an account leaves its rows behind.
+const USER_DATA_TABLES = [
+  "brokerExposures",
+  "searchHistory",
+  "phoneLookups",
+  "removalRequests",
+  "userTasks",
+  "pushTokens",
+  "inboxMessages",
+  "supportConversations",
+  "subscriptions",
+] as const;
+
+const PURGE_BATCH = 200;
+
+// Deletes one batch from each per-user table, then reschedules itself until nothing is
+// left. Batched so an account with a long history stays under mutation read/write limits.
+export const purgeUserData = internalMutation({
+  args: { userId: v.id("users"), clerkId: v.optional(v.string()) },
+  handler: async (ctx, { userId, clerkId }) => {
+    let more = false;
+
+    for (const table of USER_DATA_TABLES) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .take(PURGE_BATCH);
+      if (rows.length === PURGE_BATCH) more = true;
+
+      for (const row of rows) {
+        if (table === "brokerExposures") {
+          const screenshotId = (row as Doc<"brokerExposures">).screenshotId;
+          if (screenshotId) await ctx.storage.delete(screenshotId);
+        }
+        if (table === "supportConversations") {
+          const messages = await ctx.db
+            .query("supportMessages")
+            .withIndex("by_conversation", (q) =>
+              q.eq("conversationId", row._id as Id<"supportConversations">)
+            )
+            .take(PURGE_BATCH);
+          for (const m of messages) await ctx.db.delete(m._id);
+          // Keep the conversation until its messages are gone, so the next pass finds them.
+          if (messages.length === PURGE_BATCH) {
+            more = true;
+            continue;
+          }
+        }
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    // A subscription row written by the RevenueCat webhook before the Convex user existed
+    // has no userId; it is keyed only by the Clerk id.
+    if (clerkId) {
+      const unlinked = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_rc_app_user_id", (q) => q.eq("revenueCatAppUserId", clerkId))
+        .take(PURGE_BATCH);
+      for (const sub of unlinked) await ctx.db.delete(sub._id);
+    }
+
+    if (more) {
+      await ctx.scheduler.runAfter(0, internal.users.purgeUserData, { userId, clerkId });
+    }
+  },
+});
+
+// One-off cleanup for accounts deleted before purgeUserData existed: finds rows whose
+// user no longer exists and purges each such user. Pages through one table at a time.
+//   npx convex run users:purgeOrphanedUserData '{"dryRun": true}' --prod
+// A dry run only logs the orphaned user ids it finds (see the Convex logs).
+export const purgeOrphanedUserData = internalMutation({
+  args: {
+    dryRun: v.boolean(),
+    tableIndex: v.optional(v.number()),
+    cursor: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, { dryRun, tableIndex = 0, cursor = null }) => {
+    const table = USER_DATA_TABLES[tableIndex];
+    if (!table) return;
+
+    const page = await ctx.db
+      .query(table)
+      .paginate({ cursor, numItems: 500 });
+
+    const orphaned = new Set<Id<"users">>();
+    for (const row of page.page) {
+      const userId = (row as { userId?: Id<"users"> }).userId;
+      if (userId && !orphaned.has(userId) && !(await ctx.db.get(userId))) {
+        orphaned.add(userId);
+      }
+    }
+
+    for (const userId of orphaned) {
+      if (dryRun) {
+        console.log(`[dry run] ${table}: orphaned rows for deleted user ${userId}`);
+      } else {
+        await ctx.scheduler.runAfter(0, internal.users.purgeUserData, { userId });
+      }
+    }
+
+    await ctx.scheduler.runAfter(0, internal.users.purgeOrphanedUserData, {
+      dryRun,
+      ...(page.isDone
+        ? { tableIndex: tableIndex + 1, cursor: null }
+        : { tableIndex, cursor: page.continueCursor }),
+    });
   },
 });
 
