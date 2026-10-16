@@ -186,22 +186,26 @@ export default function PhoneLookupScreen() {
               numberOfLines={2}
             />
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.lookupButton,
-                pressed && styles.lookupButtonPressed,
-                isSubmitting && styles.lookupButtonDisabled,
-              ]}
-              onPress={handleLookup}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator size="small" color={COLOR.deepVoid} />
-              ) : (
-                <>
-                  <Ionicons name="search" size={16} color={COLOR.deepVoid} />
-                  <Text style={styles.lookupButtonText}>Look Up</Text>
-                </>
+            {/* Styled on an inner View: NativeWind's Pressable wrapper drops a
+                function-form `style`, which left the button with no background. */}
+            <Pressable onPress={handleLookup} disabled={isSubmitting}>
+              {({ pressed }) => (
+                <View
+                  style={[
+                    styles.lookupButton,
+                    pressed && styles.lookupButtonPressed,
+                    isSubmitting && styles.lookupButtonDisabled,
+                  ]}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color={COLOR.deepVoid} />
+                  ) : (
+                    <>
+                      <Ionicons name="search" size={16} color={COLOR.deepVoid} />
+                      <Text style={styles.lookupButtonText}>Look Up</Text>
+                    </>
+                  )}
+                </View>
               )}
             </Pressable>
           </GlassCard>
