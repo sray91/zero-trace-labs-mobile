@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as beehiiv from "../beehiiv.js";
 import type * as brokerExposures from "../brokerExposures.js";
 import type * as brokerSeed from "../brokerSeed.js";
 import type * as crons from "../crons.js";
@@ -22,6 +23,7 @@ import type * as removalRequests from "../removalRequests.js";
 import type * as scanner from "../scanner.js";
 import type * as scannerInternal from "../scannerInternal.js";
 import type * as searchHistory from "../searchHistory.js";
+import type * as signupAlerts from "../signupAlerts.js";
 import type * as slack from "../slack.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as support from "../support.js";
@@ -36,6 +38,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  beehiiv: typeof beehiiv;
   brokerExposures: typeof brokerExposures;
   brokerSeed: typeof brokerSeed;
   crons: typeof crons;
@@ -49,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   scanner: typeof scanner;
   scannerInternal: typeof scannerInternal;
   searchHistory: typeof searchHistory;
+  signupAlerts: typeof signupAlerts;
   slack: typeof slack;
   subscriptions: typeof subscriptions;
   support: typeof support;
